@@ -6,7 +6,7 @@ namespace ClinicManagerMAUI.Services
     /// <summary>
     /// Service for making API calls.
     /// </summary>
-    internal class ApiService : IApiService
+    public class ApiService : IApiService
     {
         private readonly HttpClient _httpClient;
 
@@ -41,6 +41,7 @@ namespace ClinicManagerMAUI.Services
         {
             var jsonData = JsonSerializer.Serialize(data);
             var content = new StringContent(jsonData, System.Text.Encoding.UTF8, "application/json");
+            endpoint = _httpClient.BaseAddress != null ? _httpClient.BaseAddress + endpoint : endpoint;
             var response = await _httpClient.PostAsync(endpoint, content);
             response.EnsureSuccessStatusCode();
             var responseContent = await response.Content.ReadAsStringAsync();

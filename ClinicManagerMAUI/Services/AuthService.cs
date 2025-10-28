@@ -7,11 +7,11 @@ namespace ClinicManagerMAUI.Services
     /// <summary>
     /// Service for handling authentication-related operations.
     /// </summary>
-    internal class AuthService : IAuthService
+    public class AuthService : IAuthService
     {
-        private readonly ApiService _apiService;
+        private readonly IApiService _apiService;
 
-        public AuthService(ApiService apiService)
+        public AuthService(IApiService apiService)
         {
             this._apiService = apiService;
         }

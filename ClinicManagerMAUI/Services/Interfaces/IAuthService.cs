@@ -6,7 +6,7 @@ namespace ClinicManagerMAUI.Services.Interfaces
     /// <summary>
     /// Service for handling authentication-related operations.
     /// </summary>
-    internal interface IAuthService
+    public interface IAuthService
     {
         /// Logs in a user with the provided login details.
         /// </summary>

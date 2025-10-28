@@ -3,7 +3,7 @@
     /// <summary>
     /// Service for making API calls.
     /// </summary>
-    internal interface IApiService
+    public interface IApiService
     {
         /// <summary>
         /// Sends a DELETE request to the specified endpoint.
