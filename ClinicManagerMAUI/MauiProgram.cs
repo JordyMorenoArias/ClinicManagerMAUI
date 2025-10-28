@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using ClinicManagerMAUI.Services;
+using ClinicManagerMAUI.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace ClinicManagerMAUI
 {
@@ -16,8 +18,15 @@ namespace ClinicManagerMAUI
 
             builder.Services.AddMauiBlazorWebView();
 
+            builder.Services.AddHttpClient<IApiService, ApiService>(client =>
+            {
+                client.BaseAddress = new Uri("https://tu-api.azurewebsites.net/");
+            });
+
+            builder.Services.AddScoped<IAuthService, AuthService>();
+
 #if DEBUG
-    		builder.Services.AddBlazorWebViewDeveloperTools();
+            builder.Services.AddBlazorWebViewDeveloperTools();
     		builder.Logging.AddDebug();
 #endif
 
