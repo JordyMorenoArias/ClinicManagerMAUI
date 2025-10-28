@@ -16,14 +16,13 @@ namespace ClinicManagerMAUI
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 });
 
-            builder.Services.AddMauiBlazorWebView();
-
             builder.Services.AddHttpClient<IApiService, ApiService>(client =>
             {
-                client.BaseAddress = new Uri("https://tu-api.azurewebsites.net/");
+                client.BaseAddress = new Uri("https://localhost:7177/api/");
             });
 
             builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddMauiBlazorWebView();
 
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();
