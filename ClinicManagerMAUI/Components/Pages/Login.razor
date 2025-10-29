@@ -125,15 +125,15 @@
                 Password = this.loginModel.Password
             };
 
-            var isAuthenticated = await AuthService.Login(loginModel);
+            var response = await AuthService.Login(loginModel);
 
-            if (isAuthenticated != null)
+            if (response.Success)
             {
                 Navigation.NavigateTo("/citas");
             }
             else
             {
-                errorMessage = "Invalid credentials. Please try again.";
+                errorMessage = response.ErrorMessage!;
             }
         }
         catch (Exception ex)

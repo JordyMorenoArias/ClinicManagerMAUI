@@ -1,4 +1,5 @@
 ﻿using ClinicManagerMAUI.Models.DTOs.Auth;
+using ClinicManagerMAUI.Models.DTOs.Generic;
 using ClinicManagerMAUI.Models.DTOs.User;
 
 namespace ClinicManagerMAUI.Services.Interfaces
@@ -12,13 +13,13 @@ namespace ClinicManagerMAUI.Services.Interfaces
         /// </summary>
         /// <param name="userLoginDto"></param>
         /// <returns> Logged in user details along with authentication token. </returns>
-        Task<AuthResponseDto?> Login(UserLoginDto userLoginDto);
+        Task<ApiResponse<AuthResponseDto>> Login(UserLoginDto userLoginDto);
 
         /// <summary>
         /// Registers a new user with the provided registration details.
         /// </summary>
         /// <param name="userRegisterDto"></param>
         /// <returns> Registered user details along with authentication token. </returns>
-        Task<AuthResponseDto?> Register(UserRegisterDto userRegisterDto);
+        Task<ApiResponse<AuthResponseDto>> Register(UserRegisterDto userRegisterDto);
     }
 }

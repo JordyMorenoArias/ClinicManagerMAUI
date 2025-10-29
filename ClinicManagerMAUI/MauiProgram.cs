@@ -21,6 +21,7 @@ namespace ClinicManagerMAUI
                 client.BaseAddress = new Uri("https://localhost:7177/api/");
             });
 
+            builder.Services.AddSingleton<ISecureStorageService, SecureStorageService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddMauiBlazorWebView();
 
