@@ -1,0 +1,35 @@
+﻿using ClinicManagerMAUI.Constants;
+using ClinicManagerMAUI.Models.DTOs.Patient;
+using ClinicManagerMAUI.Models.DTOs.User;
+using System.ComponentModel.DataAnnotations;
+
+namespace ClinicManagerMAUI.Models.DTOs.Appointment
+{
+    public class AppointmentDto
+    {
+        public int Id { get; set; }
+
+        [Required]
+        public int PatientId { get; set; }
+        public PatientDto Patient { get; set; } = null!;
+
+        [Required]
+        public int? CreatedById { get; set; }  // Who recorded the appointment (Assistant o Doctor)
+        public UserDto CreatedBy { get; set; } = null!;
+
+        [Required]
+        public int DoctorId { get; set; }
+        public UserDto Doctor { get; set; } = null!;
+
+        [Required]
+        public DateTime AppointmentDate { get; set; }
+
+        [MaxLength(300)]
+        public string Reason { get; set; } = string.Empty;
+
+        [MaxLength(50)]
+        public AppointmentStatus Status { get; set; } = AppointmentStatus.Pending;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+}

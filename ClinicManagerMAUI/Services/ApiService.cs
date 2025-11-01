@@ -2,6 +2,7 @@
 using ClinicManagerMAUI.Services.Interfaces;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace ClinicManagerMAUI.Services
@@ -12,14 +13,16 @@ namespace ClinicManagerMAUI.Services
     public class ApiService : IApiService
     {
         private readonly HttpClient _httpClient;
+        private readonly ISecureStorageService _secureStorageService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ApiService"/> class with the specified <see cref="HttpClient"/>.
         /// </summary>
         /// <param name="httpClient">The HTTP client used to send requests.</param>
-        public ApiService(HttpClient httpClient)
+        public ApiService(HttpClient httpClient, ISecureStorageService secureStorageService)
         {
             _httpClient = httpClient;
+            this._secureStorageService = secureStorageService;
         }
 
         /// <summary>
@@ -30,7 +33,16 @@ namespace ClinicManagerMAUI.Services
         /// <returns>An <see cref="ApiResponse{T}"/> object containing the result or error details.</returns>
         public async Task<ApiResponse<T>> GetAsync<T>(string endpoint)
         {
-            var response = await _httpClient.GetAsync(endpoint);
+            var url = _httpClient.BaseAddress + endpoint;
+
+            var token = await _secureStorageService.GetAsync("auth_token");
+
+            if (token != null)
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var response = await _httpClient.GetAsync(url);
             var content = await response.Content.ReadAsStringAsync();
 
             var apiResponse = new ApiResponse<T>
