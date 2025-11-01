@@ -23,6 +23,9 @@ namespace ClinicManagerMAUI
 
             builder.Services.AddSingleton<ISecureStorageService, SecureStorageService>();
             builder.Services.AddScoped<IAuthService, AuthService>();
+            builder.Services.AddScoped<IUserService, UserService>();
+            builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+            builder.Services.AddScoped<IPatientService, PatientService>();
             builder.Services.AddMauiBlazorWebView();
 
 #if DEBUG
