@@ -62,12 +62,11 @@ namespace ClinicManagerMAUI.Services
         /// <summary>
         /// Updates an existing patient's information.
         /// </summary>
-        /// <param name="patientId"></param>
         /// <param name="updatedPatient"></param>
         /// <returns> an <see cref="ApiResponse{PatientDto}"/> containing the updated patient's details.</returns>
-        public async Task<ApiResponse<PatientDto>> UpdatePatient(int patientId, UpdatePatientDto updatedPatient)
+        public async Task<ApiResponse<PatientDto>> UpdatePatient(UpdatePatientDto updatedPatient)
         {
-            return await apiService.PutAsync<UpdatePatientDto, PatientDto>($"patient/{patientId}", updatedPatient);
+            return await apiService.PutAsync<UpdatePatientDto, PatientDto>($"patient/{updatedPatient.Id}", updatedPatient);
         }
 
         /// <summary>

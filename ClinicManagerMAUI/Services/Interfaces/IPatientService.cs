@@ -39,9 +39,8 @@ namespace ClinicManagerMAUI.Services.Interfaces
         /// <summary>
         /// Updates an existing patient's information.
         /// </summary>
-        /// <param name="patientId"></param>
         /// <param name="updatedPatient"></param>
         /// <returns> an <see cref="ApiResponse{PatientDto}"/> containing the updated patient's details.</returns>
-        Task<ApiResponse<PatientDto>> UpdatePatient(int patientId, UpdatePatientDto updatedPatient);
+        Task<ApiResponse<PatientDto>> UpdatePatient(UpdatePatientDto updatedPatient);
     }
 }

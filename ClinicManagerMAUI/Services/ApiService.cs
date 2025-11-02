@@ -79,7 +79,15 @@ namespace ClinicManagerMAUI.Services
             var jsonData = JsonConvert.SerializeObject(data);
             var content = new StringContent(jsonData, System.Text.Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(_httpClient.BaseAddress + endpoint, content);
+            var token = await _secureStorageService.GetAsync("auth_token");
+
+            if (token != null)
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var url = _httpClient.BaseAddress + endpoint;
+            var response = await _httpClient.PostAsync(url, content);
             var responseContent = await response.Content.ReadAsStringAsync();
 
             var apiResponse = new ApiResponse<TResponse>
@@ -94,11 +102,21 @@ namespace ClinicManagerMAUI.Services
             }
             else
             {
-                var json = JObject.Parse(responseContent);
-                apiResponse.Success = false;
-                apiResponse.ErrorMessage = json["message"]?.ToString() != null
-                    ? json["message"]!.ToString()
-                    : $"Request failed with status code {response.StatusCode}.";
+                if (!string.IsNullOrWhiteSpace(responseContent) && responseContent.TrimStart().StartsWith("{"))
+                {
+                    var json = JObject.Parse(responseContent);
+                    apiResponse.Success = false;
+                    apiResponse.Success = false;
+                    apiResponse.ErrorMessage = json["message"]?.ToString() != null
+                        ? json["message"]!.ToString()
+                        : $"Request failed with status code {response.StatusCode}.";
+                }
+                else
+                {
+                    // Manejo alternativo si la respuesta no es JSON
+                    apiResponse.Success = false;
+                    apiResponse.ErrorMessage = "La respuesta del servidor está vacía o no es JSON.";
+                }
             }
 
             return apiResponse;
@@ -117,7 +135,15 @@ namespace ClinicManagerMAUI.Services
             var jsonData = JsonConvert.SerializeObject(data);
             var content = new StringContent(jsonData, System.Text.Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PutAsync(endpoint, content);
+            var token = await _secureStorageService.GetAsync("auth_token");
+
+            if (token != null)
+            {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var url = _httpClient.BaseAddress + endpoint;
+            var response = await _httpClient.PutAsync(url, content);
             var responseContent = await response.Content.ReadAsStringAsync();
 
             var apiResponse = new ApiResponse<TResponse>

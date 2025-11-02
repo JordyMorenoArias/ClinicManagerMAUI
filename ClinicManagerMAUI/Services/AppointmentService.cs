@@ -28,7 +28,7 @@ namespace ClinicManagerMAUI.Services
         /// <returns> an <see cref="ApiResponse{AppointmentDto}"/> containing the appointment's details if found.</returns>
         public async Task<ApiResponse<AppointmentDto>> GetAppointmentById(int appointmentId)
         {
-            return await _apiService.GetAsync<AppointmentDto>($"appointment{appointmentId}");
+            return await _apiService.GetAsync<AppointmentDto>($"appointment/{appointmentId}");
         }
 
         /// <summary>
