@@ -1,5 +1,692 @@
 ﻿@page "/Pacientes"
+@using ClinicManagerMAUI.Models.DTOs.MedicalRecord
+
+@inject IPatientService _patientService
+@inject IMedicalRecordService _medicalRecordService
+@inject ISecureStorageService _secureStorageService
+
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="mb-0">Gestión de Citas</h2>
+        </div>
+    </div>
+
+    <!-- Barra de acciones -->
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <button class="btn btn-primary" @onclick="ShowAddModal">
+                <i class="bi bi-plus-circle"></i> Añadir Paciente
+            </button>
+        </div>
+    </div>
+
+    <!-- Tabla de datos -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Cedula</th>
+                                    <th>Nombre</th>
+                                    <th>Celular</th>
+                                    <th>Email</th>
+                                    <th>Fecha de nacimiento</th>
+                                    <th class="text-end">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (patientPagedResult.Items != null && patientPagedResult.Items.Any())
+                                {
+                                    @foreach (var item in patientPagedResult.Items)
+                                    {
+                                        <tr>
+                                            <td>@item.Id</td>
+                                            <td>@item.Identification</td>
+                                            <td>@item.FullName</td>
+                                            <td>@item.Phone</td>
+                                            <td>@item.Email</td>
+                                            <td>@item.DateOfBirth.ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        @onclick="() => ShowEditModal(item)">
+                                                    <i class="bi bi-pencil"></i> Editar
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary"
+                                                        @onclick="() => OpenModalRecord(item)">
+                                                    <i class="bi bi-folder2-open"></i> Registros
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4 text-muted">
+                                            No hay datos para mostrar
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Paginación -->
+                    @if (patientPagedResult != null && patientPagedResult.TotalPages > 1)
+                    {
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div class="text-muted small">
+                                Mostrando @GetStartRecord() - @GetEndRecord() de @patientPagedResult.TotalItems registros
+                            </div>
+
+                            <nav aria-label="Paginación">
+                                <ul class="pagination mb-0">
+                                    <li class="page-item @(patientPagedResult.Page == 1 ? "disabled" : "")">
+                                        <button class="page-link" @onclick="FirstPage">Primero</button>
+                                    </li>
+                                    <li class="page-item @(patientPagedResult.Page == 1 ? "disabled" : "")">
+                                        <button class="page-link" @onclick="PreviousPage">Anterior</button>
+                                    </li>
+
+                                    @for (int i = GetStartPage(); i <= GetEndPage(); i++)
+                                    {
+                                        var pageNumber = i;
+                                        <li class="page-item @(patientPagedResult.Page == pageNumber ? "active" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(pageNumber)">
+                                                @pageNumber
+                                            </button>
+                                        </li>
+                                    }
+
+                                    <li class="page-item @(patientPagedResult.Page == patientPagedResult.TotalPages ? "disabled" : "")">
+                                        <button class="page-link" @onclick="NextPage">Siguiente</button>
+                                    </li>
+                                    <li class="page-item @(patientPagedResult.Page == patientPagedResult.TotalPages ? "disabled" : "")">
+                                        <button class="page-link" @onclick="LastPage">Último</button>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Añadir/Editar Paciente -->
+@if (showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(isEditMode ? "Editar Paciente" : "Nuevo Paciente")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre Completo</label>
+                        <input type="text" class="form-control" @bind="currentItem.FullName" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Cédula</label>
+                        <input type="text" class="form-control" @bind="currentItem.Identification" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Teléfono</label>
+                        <input type="text" class="form-control" @bind="currentItem.Phone" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Correo Electrónico</label>
+                        <input type="email" class="form-control" @bind="currentItem.Email" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Dirección</label>
+                        <input type="text" class="form-control" @bind="currentItem.Address" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Fecha de Nacimiento</label>
+                        <input type="date" class="form-control" @bind="currentItem.DateOfBirth" />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancelar</button>
+                    @if (isEditMode)
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="UpdatePatient">Actualizar</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="AddPatient">Guardar</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showRecordsModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Registros médicos de @currentItem.FullName</h5>
+                    <button type="button" class="btn-close" @onclick="CloseRecordsModal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <!-- Botón de añadir registro (solo Admin o Doctor) -->
+                    @if (userRole == UserRole.admin || userRole == UserRole.doctor)
+                    {
+                        <div class="mb-3 text-end">
+                            <button class="btn btn-primary btn-sm" @onclick="ShowAddRecordModal" >
+                                <i class="bi bi-plus-circle"></i> Añadir registro
+                            </button>
+                        </div>
+                    }
+
+                    <!-- Lista de registros médicos -->
+                    @if (medicalRecordPagedResult.Items != null && medicalRecordPagedResult.Items.Any())
+                    {
+                        <div class="list-group">
+                            @foreach (var record in medicalRecordPagedResult.Items)
+                            {
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <div class="fw-semibold text-primary">
+                                                Diagnóstico: @record.Diagnosis
+                                            </div>
+                                            <div class="text-muted">
+                                                Tratamiento: @(string.IsNullOrWhiteSpace(record.Treatment) ? "N/A" : record.Treatment)
+                                            </div>
+                                            <small class="text-secondary">
+                                                Doctor: @record.Doctor.FullName • Fecha: @record.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                            </small>
+                                        </div>
+
+                                        <!-- Botón de editar solo si el doctor actual es quien creó el registro -->
+                                        @if (userRole == UserRole.doctor && currentDoctorId == record.DoctorId)
+                                        {
+                                            <button class="btn btn-outline-secondary btn-sm" @onclick="() => ShowEditRecordModal(record)">
+                                                <i class="bi bi-pencil"></i> Editar
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-3">
+                            No se encontraron registros médicos.
+                        </div>
+                    }
+
+                    <!-- Controles de paginación -->
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="PrevModalRecordPage">Anterior</button>
+                        <span class="fw-semibold text-secondary">
+                            Página @medicalRecordQueryParameters.Page
+                        </span>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="NextModalRecordPage">Siguiente</button>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseRecordsModal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showRecordModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@((isEditRecordMode ? "Editar" : "Añadir") + " Registro Médico")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseRecordModal"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Diagnóstico <span class="text-danger">*</span></label>
+                        <textarea class="form-control" @bind="currentRecord.Diagnosis" rows="3"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Tratamiento</label>
+                        <textarea class="form-control" @bind="currentRecord.Treatment" rows="3"></textarea>
+                    </div>
+
+                    @if (isEditRecordMode)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Doctor</label>
+                            <input type="text" class="form-control" value="@currentRecord.Doctor.FullName" readonly />
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseRecordModal">Cancelar</button>
+                    @if (isEditRecordMode)
+                    {
+                        <button class="btn btn-primary" @onclick="UpdateMedicalRecord">Actualizar</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-primary" @onclick="AddMedicalRecord">Guardar</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 
 @code {
+    // ============================
+    //      PATIENTS
+    // ============================
+    private PagedResult<PatientDto> patientPagedResult = new();
+    private QueryPatientParameters patientQueryParameters = new()
+    {
+        Page = 1,
+        PageSize = 6,
+        SearchTerm = string.Empty,
+        DateOfBirth = null
+    };
 
+    private PatientDto currentItem = new();
+
+    // ============================
+    //      MEDICAL RECORDS
+    // ============================
+    private PagedResult<MedicalRecordDto> medicalRecordPagedResult = new();
+    private QueryMedicalRecordParameters medicalRecordQueryParameters = new()
+    {
+        Page = 1,
+        PageSize = 6
+    };
+
+    // ============================
+    //      MODAL CONTROL
+    // ============================
+    private bool showModal = false;
+    private bool isEditMode;
+
+    // ============================
+    //      MODAL RECORS CONTROL
+    // ============================
+    private bool showRecordsModal = false;
+    private UserRole userRole;
+    private int currentDoctorId;
+
+    // ============================
+    //      MODAL RECORD CONTROL
+    // ============================
+    private bool showRecordModal = false;
+    private bool isEditRecordMode = false;
+    private MedicalRecordDto currentRecord = new();
+
+    // ============================
+    //      INITIAL LOAD
+    // ============================
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPatients();
+    }
+
+    private async Task LoadPatients()
+    {
+        var response = await _patientService.GetPatients(patientQueryParameters);
+
+        if (response.Success)
+            patientPagedResult = response.Data!;
+    }
+
+    private async Task AddPatient()
+    {
+        var dto = new AddPatientDto
+        {
+            FullName = currentItem.FullName,
+            Identification = currentItem.Identification,
+            Phone = currentItem.Phone,
+            Email = currentItem.Email,
+            Address = currentItem.Address,
+            DateOfBirth = currentItem.DateOfBirth
+        };
+
+        var response = await _patientService.CreatePatient(dto);
+        if (response.Success)
+        {
+            await LoadPatients();
+            CloseModal();
+        }
+    }
+
+    private async Task UpdatePatient()
+    {
+        var dto = new UpdatePatientDto
+        {
+            Id = currentItem.Id,
+            FullName = currentItem.FullName,
+            Identification = currentItem.Identification,
+            Phone = currentItem.Phone,
+            Email = currentItem.Email,
+            Address = currentItem.Address,
+            DateOfBirth = currentItem.DateOfBirth
+        };
+
+        var response = await _patientService.UpdatePatient(dto);
+        if (response.Success)
+        {
+            await LoadPatients();
+            CloseModal();
+        }
+    }
+
+    // ============================
+    //      MODAL HANDLERS
+    // ============================
+    private void ShowAddModal()
+    {
+        currentItem = new();
+        showModal = true;
+    }
+
+    private void ShowEditModal(PatientDto item)
+    {
+        isEditMode = true;
+        currentItem = new PatientDto
+        {
+            Id = item.Id,
+            FullName = item.FullName,
+            Identification = item.Identification,
+            Phone = item.Phone,
+            Email = item.Email,
+            Address = item.Address,
+            DateOfBirth = item.DateOfBirth
+        };
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        currentItem = new();
+    }
+
+    // ============================
+    //      PAGINATION
+    // ============================
+    private async Task FirstPage()
+    {
+        if (patientPagedResult.Page == 1) return;
+
+        patientQueryParameters.Page = 1;
+        await LoadPatients();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (patientPagedResult.Page > 1)
+        {
+            patientQueryParameters.Page--;
+            await LoadPatients();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (patientPagedResult.Page < patientPagedResult.TotalPages)
+        {
+            patientQueryParameters.Page++;
+            await LoadPatients();
+        }
+    }
+
+    private async Task LastPage()
+    {
+        if (patientPagedResult.Page == patientPagedResult.TotalPages) return;
+
+        patientQueryParameters.Page = patientPagedResult.TotalPages;
+        await LoadPatients();
+    }
+
+    private async Task GoToPage(int pageNumber)
+    {
+        if (pageNumber < 1 || pageNumber > patientPagedResult.TotalPages) return;
+
+        patientQueryParameters.Page = pageNumber;
+        await LoadPatients();
+    }
+
+    // ============================
+    //      AUXILIARY CALCULATIONS
+    // ============================
+    private int GetStartRecord()
+    {
+        if (patientPagedResult.TotalItems == 0) return 0;
+        return ((patientPagedResult.Page - 1) * patientPagedResult.PageSize) + 1;
+    }
+
+    private int GetEndRecord()
+    {
+        if (patientPagedResult.TotalItems == 0) return 0;
+        return Math.Min(patientPagedResult.Page * patientPagedResult.PageSize, patientPagedResult.TotalItems);
+    }
+
+    private int GetStartPage()
+    {
+        int start = Math.Max(1, patientPagedResult.Page - 2);
+        return Math.Min(start, Math.Max(1, patientPagedResult.TotalPages - 4));
+    }
+
+    private int GetEndPage()
+    {
+        int end = Math.Min(patientPagedResult.TotalPages, GetStartPage() + 4);
+        return Math.Max(end, Math.Min(5, patientPagedResult.TotalPages));
+    }
+
+    // ============================
+    //      MODAL RECORDS HANDLERS
+    // ============================
+
+    private async Task LoadMedicalRecords()
+    {
+        var response = await _medicalRecordService.GetMedicalRecords(medicalRecordQueryParameters);
+
+        if (response.Success)
+            medicalRecordPagedResult = response.Data!;
+    }
+
+    private async Task FilterPatients()
+    {
+        patientQueryParameters.Page = 1;
+        await LoadPatients();
+    }
+
+    private async Task PrevModalRecordPage()
+    {
+        if (medicalRecordQueryParameters.Page > 1)
+        {
+            medicalRecordQueryParameters.Page--;
+            await LoadMedicalRecords();
+        }
+    }
+
+    private async Task NextModalRecordPage()
+    {
+        if (medicalRecordQueryParameters.Page >= medicalRecordPagedResult.TotalPages)
+            medicalRecordQueryParameters.Page = 1;
+        else
+            medicalRecordQueryParameters.Page++;
+
+        await LoadMedicalRecords();
+    }
+
+    private async Task OpenModalRecord(PatientDto patient)
+    {
+        currentItem = patient;
+        medicalRecordQueryParameters.patientId = patient.Id;
+        await DecodeJwtToken();
+        await LoadMedicalRecords();
+        showRecordsModal = true;
+    }
+
+    private void CloseRecordsModal()
+    {
+        showRecordsModal = false;
+        currentItem = new();
+        medicalRecordPagedResult = new();
+    }
+
+    // ============================
+    //      JWT DECODING
+    // ============================
+    private async Task DecodeJwtToken()
+    {
+        var token = await _secureStorageService.GetAsync("auth_token");
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            userRole = UserRole.assistant;
+            currentDoctorId = 0;
+            return;
+        }
+
+        try
+        {
+            // El JWT está en formato "header.payload.signature"
+            var parts = token.Split('.');
+            if (parts.Length != 3)
+                throw new Exception("Token inválido");
+
+            // Decodificamos el payload (parte 2)
+            var payload = parts[1];
+            var jsonBytes = ParseBase64WithoutPadding(payload);
+            var json = System.Text.Encoding.UTF8.GetString(jsonBytes);
+
+            // Deserializamos el contenido
+            var claims = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+
+            if (claims != null)
+            {
+                if (claims.TryGetValue("Role", out var roleValue))
+                {
+                    Enum.TryParse(roleValue.ToString(), true, out userRole);
+                }
+
+                if (claims.TryGetValue("Id", out var idValue))
+                {
+                    int.TryParse(idValue.ToString(), out currentDoctorId);
+                }
+            }
+        }
+        catch
+        {
+            userRole = UserRole.assistant;
+            currentDoctorId = 0;
+        }
+    }
+
+    // Convierte Base64URL a bytes
+    private static byte[] ParseBase64WithoutPadding(string base64)
+    {
+        switch (base64.Length % 4)
+        {
+            case 2: base64 += "=="; break;
+            case 3: base64 += "="; break;
+        }
+
+        base64 = base64.Replace('-', '+').Replace('_', '/');
+        return Convert.FromBase64String(base64);
+    }
+
+    // ============================
+    //      MODAL RECORD HANDLERS
+    // ============================
+    private void ShowAddRecordModal()
+    {
+        isEditRecordMode = false;
+        currentRecord = new MedicalRecordDto
+        {
+            PatientId = currentItem.Id,
+            DoctorId = currentDoctorId
+        };
+        showRecordModal = true;
+    }
+
+    private void ShowEditRecordModal(MedicalRecordDto record)
+    {
+        isEditRecordMode = true;
+        currentRecord = record;
+        showRecordModal = true;
+    }
+
+    private void CloseRecordModal()
+    {
+        showRecordModal = false;
+        currentRecord = new MedicalRecordDto();
+    }
+
+    // ============================
+    //      MÉTODOS DE GUARDADO
+    // ============================
+    private async Task AddMedicalRecord()
+    {
+        var dto = new AddMedicalRecordDto
+        {
+            PatientId = currentRecord.PatientId,
+            Diagnosis = currentRecord.Diagnosis,
+            Treatment = currentRecord.Treatment
+        };
+
+        var response = await _medicalRecordService.CreateMedicalRecord(dto);
+
+        if (response.Success)
+        {
+            await LoadMedicalRecords();
+            CloseRecordModal();
+        }
+    }
+
+    private async Task UpdateMedicalRecord()
+    {
+        var dto = new UpdateMedicalRecordDto
+        {
+            Id = currentRecord.Id,
+            Diagnosis = currentRecord.Diagnosis,
+            Treatment = currentRecord.Treatment
+        };
+
+        var response = await _medicalRecordService.UpdateMedicalRecord(dto);
+
+        if (response.Success)
+        {
+            await LoadMedicalRecords();
+            CloseRecordModal();
+        }
+    }
 }
