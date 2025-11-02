@@ -193,11 +193,11 @@
                         <div class="mb-3">
                             <label class="form-label">Estado</label>
                             <select class="form-select" @bind="currentItem.Status">
-                                <option value="1">Pendiente</option>
-                                <option value="2">Confirmada</option>
-                                <option value="3">Completada</option>
-                                <option value="4">Cancelada</option>
-                                <option value="5">No Mostrar</option>
+                                <option value=@AppointmentStatus.Pending>Pendiente</option>
+                                <option value=@AppointmentStatus.Confirmed>Confirmada</option>
+                                <option value=@AppointmentStatus.Completed>Completada</option>
+                                <option value=@AppointmentStatus.Cancelled>Cancelada</option>
+                                <option value=@AppointmentStatus.NoShow>No Mostrar</option>
                             </select>
                         </div>
                     }
@@ -217,7 +217,6 @@
             </div>
         </div>
     </div>
-
 }
 
 @if (showSelector)
@@ -369,6 +368,10 @@
     // ============================
     private bool showModal = false;
     private bool isEditMode = false;
+
+    // ============================
+    //      SELECTOR CONTROL
+    // ============================
     private bool showSelector = false;
     private bool isDoctorSelector = false;
 
@@ -452,7 +455,18 @@
     private void ShowEditModal(AppointmentDto item)
     {
         isEditMode = true;
-        currentItem = item;
+        currentItem = new AppointmentDto
+        {
+            Id = item.Id,
+            PatientId = item.PatientId,
+            Patient = item.Patient,
+            DoctorId = item.DoctorId,
+            Doctor = item.Doctor,
+            AppointmentDate = item.AppointmentDate,
+            Reason = item.Reason,
+            Status = item.Status,
+            CreatedAt = item.CreatedAt
+        };
         showModal = true;
     }
 
