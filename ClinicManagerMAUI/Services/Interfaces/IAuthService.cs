@@ -9,6 +9,12 @@ namespace ClinicManagerMAUI.Services.Interfaces
     /// </summary>
     public interface IAuthService
     {
+        /// <summary>
+        /// Decodes the stored JWT token to extract user information.
+        /// </summary>
+        /// <returns> a <see cref="UserAuthenticatedDto"/> containing the authenticated user's details.</returns>
+        Task<UserAuthenticatedDto> DecodeAsync();
+
         /// Logs in a user with the provided login details.
         /// </summary>
         /// <param name="userLoginDto"></param>

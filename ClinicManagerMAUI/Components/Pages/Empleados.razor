@@ -1,5 +1,759 @@
 ﻿@page "/Empleados"
+@using ClinicManagerMAUI.Models.DTOs.DoctorProfile
+@inject IAuthService _authService
+@inject IUserService _userService
+@inject IDoctorProfileService _doctorProfileService
+
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="mb-0">Gestión de Empleados</h2>
+        </div>
+    </div>
+
+    <!-- Mensajes de error/éxito -->
+    @if (!string.IsNullOrEmpty(messageText))
+    {
+        <div class="alert @(messageType == "success" ? "alert-success" : "alert-danger") alert-dismissible fade show" role="alert">
+            @messageText
+            <button type="button" class="btn-close" @onclick="ClearMessage"></button>
+        </div>
+    }
+
+    <!-- Botón Añadir (solo Admin) -->
+    @if (userAuth?.Role == UserRole.admin)
+    {
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <button class="btn btn-primary" @onclick="ShowAddModal">
+                    <i class="bi bi-plus-circle"></i> Añadir Empleado
+                </button>
+            </div>
+        </div>
+    }
+
+    <!-- Tabla de empleados -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombre</th>
+                                    <th>Usuario</th>
+                                    <th>Correo</th>
+                                    <th>Teléfono</th>
+                                    <th>Rol</th>
+                                    <th>Especialidad</th>
+                                    <th>Estado</th>
+                                    <th>Creado</th>
+                                    @if (userAuth?.Role == UserRole.admin)
+                                    {
+                                        <th class="text-end">Acciones</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (userPagedResult.Items != null && userPagedResult.Items.Any())
+                                {
+                                    @foreach (var user in userPagedResult.Items)
+                                    {
+                                        <tr>
+                                            <td>@user.Id</td>
+                                            <td>@user.FullName</td>
+                                            <td>@user.Username</td>
+                                            <td>@user.Email</td>
+                                            <td>@user.PhoneNumber</td>
+                                            <td>
+                                                <span class="badge bg-@GetRoleBadgeColor(user.Role)">
+                                                    @user.Role.ToString()
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @if (user.Role == UserRole.doctor)
+                                                {
+                                                    var profile = doctorProfiles.FirstOrDefault(d => d.DoctorId == user.Id);
+                                                    if (profile != null)
+                                                    {
+                                                        <span class="badge bg-info">@profile.Specialty</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted small">Sin especialidad</span>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">-</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (user.IsActive)
+                                                {
+                                                    <span class="badge bg-success">Activo</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Inactivo</span>
+                                                }
+                                            </td>
+                                            <td>@user.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                            @if (userAuth?.Role == UserRole.admin)
+                                            {
+                                                <td class="text-end">
+                                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ShowEditModal(user)">
+                                                        <i class="bi bi-pencil"></i> Editar
+                                                    </button>
+
+                                                    @if (user.Role == UserRole.doctor)
+                                                    {
+                                                        <button class="btn btn-sm btn-outline-info me-1" @onclick="() => ShowSpecialtyModal(user)">
+                                                            <i class="bi bi-award"></i> Especialidad
+                                                        </button>
+                                                    }
+
+                                                    <!-- NUEVO BOTÓN: Cambiar contraseña -->
+                                                    <button class="btn btn-sm btn-outline-warning" @onclick="() => ShowChangePasswordModal(user)">
+                                                        <i class="bi bi-key"></i> Contraseña
+                                                    </button>
+                                                </td>
+                                            }
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="10" class="text-center text-muted py-3">
+                                            No hay empleados registrados.
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Paginación -->
+                    @if (userPagedResult != null && userPagedResult.TotalPages > 1)
+                    {
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div class="text-muted small">
+                                Mostrando @GetStartRecord() - @GetEndRecord() de @userPagedResult.TotalItems
+                            </div>
+                            <nav aria-label="Paginación">
+                                <ul class="pagination mb-0">
+                                    <li class="page-item @(userPagedResult.Page == 1 ? "disabled" : "")">
+                                        <button class="page-link" @onclick="PreviousPage">Anterior</button>
+                                    </li>
+                                    @for (int i = GetStartPage(); i <= GetEndPage(); i++)
+                                    {
+                                        var pageNumber = i;
+                                        <li class="page-item @(userPagedResult.Page == pageNumber ? "active" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(pageNumber)">
+                                                @pageNumber
+                                            </button>
+                                        </li>
+                                    }
+                                    <li class="page-item @(userPagedResult.Page == userPagedResult.TotalPages ? "disabled" : "")">
+                                        <button class="page-link" @onclick="NextPage">Siguiente</button>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Añadir/Editar Empleado -->
+@if (showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@((isEditMode ? "Editar" : "Nuevo") + " Empleado")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(modalError))
+                    {
+                        <div class="alert alert-danger">@modalError</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Nombre Completo <span class="text-danger">*</span></label>
+                        <input class="form-control" @bind="currentItem.FullName" placeholder="Ej: Juan Pérez" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Correo Electrónico <span class="text-danger">*</span></label>
+                        <input class="form-control" type="email" @bind="currentItem.Email" placeholder="correo@ejemplo.com" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Teléfono</label>
+                        <input class="form-control" @bind="currentItem.PhoneNumber" placeholder="809-555-5555" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Rol <span class="text-danger">*</span></label>
+                        <select class="form-select" @bind="currentItem.Role">
+                            <option value=@UserRole.admin>Administrador</option>
+                            <option value=@UserRole.doctor>Doctor</option>
+                            <option value=@UserRole.assistant>Asistente</option>
+                        </select>
+                    </div>
+
+                    @if (!isEditMode)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Usuario <span class="text-danger">*</span></label>
+                            <input class="form-control" @bind="currentRegister.Username" placeholder="nombre.usuario" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Contraseña <span class="text-danger">*</span></label>
+                            <input class="form-control" type="password" @bind="currentRegister.Password" placeholder="Mínimo 6 caracteres" />
+                        </div>
+                    }
+
+                    @if (isEditMode)
+                    {
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" @bind="currentItem.IsActive" />
+                            <label class="form-check-label">Activo</label>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseModal" disabled="@isLoading">Cancelar</button>
+                    @if (isEditMode)
+                    {
+                        <button class="btn btn-primary" @onclick="UpdateUser" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            Actualizar
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-primary" @onclick="AddUser" disabled="@isLoading">
+                            @if (isLoading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            Guardar
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Especialidad Doctor -->
+@if (showSpecialtyModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-award"></i> Especialidad de @selectedDoctor?.FullName
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseSpecialtyModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(modalError))
+                    {
+                        <div class="alert alert-danger">@modalError</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Especialidad <span class="text-danger">*</span></label>
+                        <input class="form-control" @bind="currentDoctorProfile.Specialty"
+                               placeholder="Ej: Cardiología, Pediatría, Medicina General" maxlength="100" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Descripción</label>
+                        <textarea class="form-control" rows="3" @bind="currentDoctorProfile.Description"
+                                  placeholder="Descripción breve de la especialidad y experiencia" maxlength="255"></textarea>
+                        <small class="text-muted">@(currentDoctorProfile.Description?.Length ?? 0)/255 caracteres</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Años de Experiencia</label>
+                                <input class="form-control" type="number" min="0" max="50"
+                                       @bind="currentDoctorProfile.YearsOfExperience" placeholder="Ej: 5" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Número de Licencia</label>
+                                <input class="form-control" @bind="currentDoctorProfile.LicenseNumber"
+                                       placeholder="Ej: MED-12345" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseSpecialtyModal" disabled="@isLoading">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-primary" @onclick="SaveDoctorProfile" disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        @(isEditingProfile ? "Actualizar" : "Guardar") Especialidad
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showChangePasswordModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="bi bi-key"></i> Cambiar Contraseña</h5>
+                    <button type="button" class="btn-close" @onclick="() => showChangePasswordModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-3">Cambia la contraseña del usuario <strong>@selectedUserForPassword.FullName</strong>.</p>
+
+                    <div class="mb-3">
+                        <label class="form-label">Nueva contraseña</label>
+                        <input type="password" class="form-control" @bind="newPassword" placeholder="Escribe la nueva contraseña" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showChangePasswordModal = false">Cancelar</button>
+                    <button class="btn btn-warning" @onclick="ChangeUserPassword">Guardar cambios</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 @code {
+    private PagedResult<UserDto> userPagedResult = new();
+    private QueryUserParameters queryParams = new() { Page = 1, PageSize = 10 };
+    private List<DoctorProfileDto> doctorProfiles = new();
 
+    private UserDto currentItem = new();
+    private UserRegisterDto currentRegister = new();
+    private DoctorProfileDto currentDoctorProfile = new();
+    private UserDto? selectedDoctor;
+
+    private bool showModal = false;
+    private bool showSpecialtyModal = false;
+    private bool isEditMode = false;
+    private bool isEditingProfile = false;
+    private bool isLoading = false;
+
+    private UserAuthenticatedDto? userAuth;
+    private string? messageText;
+    private string? messageType;
+    private string? modalError;
+
+    private bool showChangePasswordModal = false;
+    private UserDto selectedUserForPassword;
+    private string newPassword = string.Empty;
+
+    private void ShowChangePasswordModal(UserDto user)
+    {
+        selectedUserForPassword = user;
+        newPassword = string.Empty;
+        showChangePasswordModal = true;
+    }
+
+    private async Task ChangeUserPassword()
+    {
+        if (string.IsNullOrWhiteSpace(newPassword))
+        {
+            messageType = "danger";
+            messageText = "La nueva contraseña no puede estar vacía.";
+            return;
+        }
+
+        var dto = new UserChangePasswordDto
+        {
+            UserId = selectedUserForPassword.Id,
+            NewPassword = newPassword
+        };
+
+        var response = await _userService.ChangePassword(dto);
+
+        if (response.Success)
+        {
+            messageType = "success";
+            messageText = $"Contraseña cambiada correctamente para {selectedUserForPassword.FullName}.";
+            showChangePasswordModal = false;
+        }
+        else
+        {
+            messageType = "danger";
+            messageText = response.ErrorMessage ?? "Error al cambiar la contraseña.";
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        userAuth = await _authService.DecodeAsync();
+        await LoadUsers();
+        await LoadDoctorProfiles();
+    }
+
+    private async Task LoadUsers()
+    {
+        var response = await _userService.GetUsers(queryParams);
+        if (response.Success)
+            userPagedResult = response.Data!;
+    }
+
+    private async Task LoadDoctorProfiles()
+    {
+        var queryDoctorParams = new QueryDoctorProfileParameters { Page = 1, PageSize = 100 };
+        var response = await _doctorProfileService.GetDoctorProfiles(queryDoctorParams);
+        if (response.Success && response.Data?.Items != null)
+            doctorProfiles = response.Data.Items.ToList();
+    }
+
+    #region Modal Usuario
+
+    private void ShowAddModal()
+    {
+        currentItem = new();
+        currentRegister = new();
+        isEditMode = false;
+        modalError = null;
+        showModal = true;
+    }
+
+    private void ShowEditModal(UserDto user)
+    {
+        isEditMode = true;
+        modalError = null;
+        currentItem = new UserDto
+        {
+            Id = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            PhoneNumber = user.PhoneNumber,
+            Role = user.Role,
+            IsActive = user.IsActive
+        };
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        currentItem = new();
+        currentRegister = new();
+        modalError = null;
+    }
+
+    private async Task AddUser()
+    {
+        if (!ValidateUser()) return;
+
+        isLoading = true;
+        modalError = null;
+
+        var dto = new UserRegisterDto
+        {
+            FullName = currentItem.FullName,
+            Username = currentRegister.Username,
+            Email = currentItem.Email,
+            PhoneNumber = currentItem.PhoneNumber,
+            Role = currentItem.Role,
+            Password = currentRegister.Password
+        };
+
+        var response = await _authService.Register(dto);
+        isLoading = false;
+
+        if (response.Success)
+        {
+            ShowMessage("Empleado creado exitosamente", "success");
+            await LoadUsers();
+            CloseModal();
+        }
+        else
+        {
+            modalError = response.ErrorMessage ?? "Error al crear el empleado";
+        }
+    }
+
+    private async Task UpdateUser()
+    {
+        if (!ValidateUser()) return;
+
+        isLoading = true;
+        modalError = null;
+
+        var dto = new UserUpdateDto
+        {
+            Id = currentItem.Id,
+            FullName = currentItem.FullName,
+            Email = currentItem.Email,
+            PhoneNumber = currentItem.PhoneNumber,
+            Role = currentItem.Role,
+            IsActive = currentItem.IsActive
+        };
+
+        // ✅ CORRECCIÓN: Usar currentItem.Id en lugar de userAuth.Id
+        var response = await _userService.UpdateUser(currentItem.Id, dto);
+        isLoading = false;
+
+        if (response.Success)
+        {
+            ShowMessage("Empleado actualizado exitosamente", "success");
+            await LoadUsers();
+            CloseModal();
+        }
+        else
+        {
+            modalError = response.ErrorMessage ?? "Error al actualizar el empleado";
+        }
+    }
+
+    private bool ValidateUser()
+    {
+        if (string.IsNullOrWhiteSpace(currentItem.FullName))
+        {
+            modalError = "El nombre completo es requerido";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(currentItem.Email))
+        {
+            modalError = "El correo electrónico es requerido";
+            return false;
+        }
+
+        if (!isEditMode)
+        {
+            if (string.IsNullOrWhiteSpace(currentRegister.Username))
+            {
+                modalError = "El nombre de usuario es requerido";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(currentRegister.Password) || currentRegister.Password.Length < 6)
+            {
+                modalError = "La contraseña debe tener al menos 6 caracteres";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    #endregion
+
+    #region Modal Especialidad
+
+    private void ShowSpecialtyModal(UserDto doctor)
+    {
+        if (doctor.Role != UserRole.doctor || userAuth?.Role != UserRole.admin)
+            return;
+
+        selectedDoctor = doctor;
+        modalError = null;
+
+        var existingProfile = doctorProfiles.FirstOrDefault(d => d.DoctorId == doctor.Id);
+
+        if (existingProfile != null)
+        {
+            isEditingProfile = true;
+            currentDoctorProfile = new DoctorProfileDto
+            {
+                Id = existingProfile.Id,
+                DoctorId = existingProfile.DoctorId,
+                Specialty = existingProfile.Specialty,
+                Description = existingProfile.Description,
+                YearsOfExperience = existingProfile.YearsOfExperience,
+                LicenseNumber = existingProfile.LicenseNumber
+            };
+        }
+        else
+        {
+            isEditingProfile = false;
+            currentDoctorProfile = new DoctorProfileDto
+            {
+                DoctorId = doctor.Id
+            };
+        }
+
+        showSpecialtyModal = true;
+    }
+
+    private void CloseSpecialtyModal()
+    {
+        showSpecialtyModal = false;
+        currentDoctorProfile = new();
+        selectedDoctor = null;
+        modalError = null;
+    }
+
+    private async Task SaveDoctorProfile()
+    {
+        if (!ValidateDoctorProfile()) return;
+
+        isLoading = true;
+        modalError = null;
+
+        ApiResponse<DoctorProfileDto> response;
+
+        if (isEditingProfile)
+        {
+            var updateDto = new UpdateDoctorProfileDto
+            {
+                Id = currentDoctorProfile.Id,
+                DoctorId = currentDoctorProfile.DoctorId,
+                Specialty = currentDoctorProfile.Specialty,
+                Description = currentDoctorProfile.Description,
+                YearsOfExperience = currentDoctorProfile.YearsOfExperience,
+                LicenseNumber = currentDoctorProfile.LicenseNumber
+            };
+
+            response = await _doctorProfileService.UpdateDoctorProfile(currentDoctorProfile.Id, updateDto);
+        }
+        else
+        {
+            var addDto = new AddDoctorProfileDto
+            {
+                DoctorId = currentDoctorProfile.DoctorId,
+                Specialty = currentDoctorProfile.Specialty,
+                Description = currentDoctorProfile.Description,
+                YearsOfExperience = currentDoctorProfile.YearsOfExperience,
+                LicenseNumber = currentDoctorProfile.LicenseNumber
+            };
+
+            response = await _doctorProfileService.CreateDoctorProfile(addDto);
+        }
+
+        isLoading = false;
+
+        if (response.Success)
+        {
+            ShowMessage($"Especialidad {(isEditingProfile ? "actualizada" : "creada")} exitosamente", "success");
+            await LoadDoctorProfiles();
+            CloseSpecialtyModal();
+        }
+        else
+        {
+            modalError = response.ErrorMessage ?? "Error al guardar la especialidad";
+        }
+    }
+
+    private bool ValidateDoctorProfile()
+    {
+        if (string.IsNullOrWhiteSpace(currentDoctorProfile.Specialty))
+        {
+            modalError = "La especialidad es requerida";
+            return false;
+        }
+
+        if (currentDoctorProfile.Specialty.Length > 100)
+        {
+            modalError = "La especialidad no puede exceder 100 caracteres";
+            return false;
+        }
+
+        if (!string.IsNullOrEmpty(currentDoctorProfile.Description) &&
+            currentDoctorProfile.Description.Length > 255)
+        {
+            modalError = "La descripción no puede exceder 255 caracteres";
+            return false;
+        }
+
+        if (currentDoctorProfile.YearsOfExperience.HasValue &&
+            (currentDoctorProfile.YearsOfExperience < 0 || currentDoctorProfile.YearsOfExperience > 50))
+        {
+            modalError = "Los años de experiencia deben estar entre 0 y 50";
+            return false;
+        }
+
+        return true;
+    }
+
+    #endregion
+
+    #region Paginación
+
+    private async Task PreviousPage()
+    {
+        if (userPagedResult.Page > 1)
+        {
+            queryParams.Page--;
+            await LoadUsers();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (userPagedResult.Page < userPagedResult.TotalPages)
+        {
+            queryParams.Page++;
+            await LoadUsers();
+        }
+    }
+
+    private async Task GoToPage(int pageNumber)
+    {
+        queryParams.Page = pageNumber;
+        await LoadUsers();
+    }
+
+    private int GetStartRecord() => ((userPagedResult.Page - 1) * userPagedResult.PageSize) + 1;
+    private int GetEndRecord() => Math.Min(userPagedResult.Page * userPagedResult.PageSize, userPagedResult.TotalItems);
+    private int GetStartPage() => Math.Max(1, userPagedResult.Page - 2);
+    private int GetEndPage() => Math.Min(userPagedResult.TotalPages, GetStartPage() + 4);
+
+    #endregion
+
+    #region Utilidades
+
+    private void ShowMessage(string text, string type)
+    {
+        messageText = text;
+        messageType = type;
+        StateHasChanged();
+
+        Task.Delay(5000).ContinueWith(_ => ClearMessage());
+    }
+
+    private void ClearMessage()
+    {
+        messageText = null;
+        messageType = null;
+    }
+
+    private string GetRoleBadgeColor(UserRole role) => role switch
+    {
+        UserRole.admin => "danger",
+        UserRole.doctor => "primary",
+        UserRole.assistant => "secondary",
+        _ => "secondary"
+    };
+
+    #endregion
 }

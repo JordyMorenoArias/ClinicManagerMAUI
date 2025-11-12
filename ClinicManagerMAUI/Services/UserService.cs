@@ -65,5 +65,15 @@ namespace ClinicManagerMAUI.Services
         {
             return await _apiService.PutAsync<UserUpdateDto, UserDto>($"user/{userId}", updatedUser);
         }
+
+        /// <summary>
+        /// Changes the password of a user.
+        /// </summary>
+        /// <param name="changePasswordDto"></param>
+        /// <returns> An <see cref="ApiResponse{UserDto}"/> containing the user's details after the password change.</returns>
+        public async Task<ApiResponse<UserDto>> ChangePassword(UserChangePasswordDto changePasswordDto)
+        {
+            return await _apiService.PutAsync<UserChangePasswordDto, UserDto>("user/change-password", changePasswordDto);
+        }
     }
 }

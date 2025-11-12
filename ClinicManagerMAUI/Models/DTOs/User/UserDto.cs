@@ -1,4 +1,7 @@
 ﻿using ClinicManagerMAUI.Constants;
+using ClinicManagerMAUI.Models.DTOs.Appointment;
+using ClinicManagerMAUI.Models.DTOs.DoctorProfile;
+using ClinicManagerMAUI.Models.DTOs.MedicalRecord;
 using System.ComponentModel.DataAnnotations;
 
 namespace ClinicManagerMAUI.Models.DTOs.User
@@ -25,5 +28,13 @@ namespace ClinicManagerMAUI.Models.DTOs.User
         public bool IsActive { get; set; }
 
         public DateTime CreatedAt { get; set; }
+
+        public ICollection<AppointmentDto> CreatedAppointments { get; set; } = new List<AppointmentDto>();
+
+        public ICollection<AppointmentDto> DoctorAppointments { get; set; } = new List<AppointmentDto>();
+
+        public ICollection<MedicalRecordDto> MedicalRecords { get; set; } = new List<MedicalRecordDto>();
+
+        public ICollection<DoctorProfileDto> DoctorProfiles { get; set; } = new List<DoctorProfileDto>();
     }
 }

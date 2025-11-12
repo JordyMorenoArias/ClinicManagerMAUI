@@ -9,6 +9,13 @@ namespace ClinicManagerMAUI.Services.Interfaces
     public interface IUserService
     {
         /// <summary>
+        /// Changes the password of a user.
+        /// </summary>
+        /// <param name="changePasswordDto"></param>
+        /// <returns> An <see cref="ApiResponse{UserDto}"/> containing the user's details after the password change.</returns>
+        Task<ApiResponse<UserDto>> ChangePassword(UserChangePasswordDto changePasswordDto);
+
+        /// <summary>
         /// Retrieves a user by their unique identifier.
         /// </summary>
         /// <param name="userId"></param>

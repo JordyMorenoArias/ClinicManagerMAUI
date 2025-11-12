@@ -1,7 +1,10 @@
-﻿using ClinicManagerMAUI.Models.DTOs.Auth;
+﻿using ClinicManagerMAUI.Constants;
+using ClinicManagerMAUI.Models.DTOs.Auth;
 using ClinicManagerMAUI.Models.DTOs.Generic;
 using ClinicManagerMAUI.Models.DTOs.User;
 using ClinicManagerMAUI.Services.Interfaces;
+using System.Text;
+using System.Text.Json;
 
 namespace ClinicManagerMAUI.Services
 {
@@ -17,6 +20,65 @@ namespace ClinicManagerMAUI.Services
         {
             this._apiService = apiService;
             this._secureStorageService = tokenService;
+        }
+
+        /// <summary>
+        /// Decodes the stored JWT token to extract user information.
+        /// </summary>
+        /// <returns> a <see cref="UserAuthenticatedDto"/> containing the authenticated user's details.</returns>
+        public async Task<UserAuthenticatedDto> DecodeAsync()
+        {
+            var token = await _secureStorageService.GetAsync("auth_token");
+
+            if (string.IsNullOrWhiteSpace(token))
+                throw new Exception("No se encontró el token de autenticación");
+
+            var parts = token.Split('.');
+
+            if (parts.Length != 3)
+                throw new Exception("Token inválido");
+
+            // Decodificar payload (parte 2)
+            var payload = parts[1];
+            var jsonBytes = ParseBase64WithoutPadding(payload);
+            var json = Encoding.UTF8.GetString(jsonBytes);
+
+            // Deserializar el payload
+            var claims = JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+
+            if (claims is null)
+                throw new Exception("No se pudieron obtener los claims del token");
+
+            var user = new UserAuthenticatedDto();
+
+            if (claims.TryGetValue("Role", out var roleValue))
+            {
+                if (Enum.TryParse<UserRole>(roleValue.ToString(), true, out var parsedRole))
+                    user.Role = parsedRole;
+            }
+
+            if (claims.TryGetValue("Id", out var idValue))
+            {
+                if (int.TryParse(idValue.ToString(), out var parsedId))
+                    user.Id = parsedId;
+            }
+
+            if (claims.TryGetValue("Email", out var emailValue))
+                user.Email = emailValue?.ToString() ?? string.Empty;
+
+            return user;
+        }
+
+        private static byte[] ParseBase64WithoutPadding(string base64)
+        {
+            switch (base64.Length % 4)
+            {
+                case 2: base64 += "=="; break;
+                case 3: base64 += "="; break;
+            }
+
+            base64 = base64.Replace('-', '+').Replace('_', '/');
+            return Convert.FromBase64String(base64);
         }
 
         /// <summary>
