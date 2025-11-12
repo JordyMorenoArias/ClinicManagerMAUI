@@ -17,7 +17,7 @@ namespace ClinicManagerMAUI.Services.Interfaces
         /// </summary>
         /// <param name="medicalRecordId"></param>
         /// <returns> an <see cref="ApiResponse{MedicalRecordDto}"/> containing the medical record's details if found.</returns>
-        Task<ApiResponse<MedicalRecordDto>> GetMedicalRecordById(int medical);
+        Task<ApiResponse<MedicalRecordDto>> GetMedicalRecordById(int medicalRecordId);
 
         /// <summary>
         /// Retrieves a paginated list of medical records based on query parameters.
