@@ -1,9 +1,13 @@
 ﻿@page "/Pacientes"
-@using ClinicManagerMAUI.Models.DTOs.MedicalRecord
+@using ClinicManagerMAUI.Models.DTOs.Allergy
+@using ClinicManagerMAUI.Models.DTOs.PatientAllergy
 
+@inject IAuthService _authService
 @inject IPatientService _patientService
 @inject IMedicalRecordService _medicalRecordService
 @inject ISecureStorageService _secureStorageService
+@inject IAllergyService _allergyService
+@inject IPatientAllergyService _patientAllergyService
 
 <div class="container-fluid py-4">
     <div class="row mb-4">
@@ -31,11 +35,12 @@
                             <thead class="table-light">
                                 <tr>
                                     <th>ID</th>
-                                    <th>Cedula</th>
+                                    <th>Cédula</th>
                                     <th>Nombre</th>
                                     <th>Celular</th>
                                     <th>Email</th>
                                     <th>Fecha de nacimiento</th>
+                                    <th>Alergias</th>
                                     <th class="text-end">Acciones</th>
                                 </tr>
                             </thead>
@@ -50,16 +55,48 @@
                                             <td>@item.FullName</td>
                                             <td>@item.Phone</td>
                                             <td>@item.Email</td>
-                                            <td>@item.DateOfBirth.ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td>@item.DateOfBirth.ToString("dd/MM/yyyy")</td>
+                                            <td>
+                                                @if (item.Allergies != null && item.Allergies.Any())
+                                                {
+                                                    <div class="d-flex flex-wrap gap-1">
+                                                        @foreach (var allergy in item.Allergies)
+                                                        {
+                                                            var badgeClass = GetSeverityBadgeClass(allergy.Severity);
+                                                            <span class="badge @badgeClass"
+                                                                  title="@allergy.Allergy?.Name - Severidad: @allergy.Severity (@allergy.Notes)">
+                                                                @allergy.Allergy?.Name
+                                                                @if (allergy.Severity == SeverityAllergy.Severe)
+                                                                {
+                                                                    <i class="bi bi-exclamation-triangle-fill ms-1"></i>
+                                                                }
+                                                            </span>
+                                                        }
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted small">Sin alergias</span>
+                                                }
+                                            </td>
                                             <td class="text-end">
-                                                <button class="btn btn-sm btn-outline-primary"
-                                                        @onclick="() => ShowEditModal(item)">
-                                                    <i class="bi bi-pencil"></i> Editar
-                                                </button>
-                                                <button class="btn btn-sm btn-outline-secondary"
-                                                        @onclick="() => OpenModalRecord(item)">
-                                                    <i class="bi bi-folder2-open"></i> Registros
-                                                </button>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <button class="btn btn-outline-primary"
+                                                            @onclick="() => ShowEditModal(item)"
+                                                            title="Editar paciente">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-success"
+                                                            @onclick="() => ShowAddPatientAllergy(item)"
+                                                            title="Gestionar alergias">
+                                                        <i class="bi bi-heart-pulse"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-secondary"
+                                                            @onclick="() => OpenModalRecord(item)"
+                                                            title="Ver registros médicos">
+                                                        <i class="bi bi-folder2-open"></i>
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     }
@@ -67,7 +104,8 @@
                                 else
                                 {
                                     <tr>
-                                        <td colspan="6" class="text-center py-4 text-muted">
+                                        <td colspan="8" class="text-center py-4 text-muted">
+                                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
                                             No hay datos para mostrar
                                         </td>
                                     </tr>
@@ -138,7 +176,11 @@
 
                     <div class="mb-3">
                         <label class="form-label">Cédula</label>
-                        <input type="text" class="form-control" @bind="currentItem.Identification" />
+                        <input type="text"
+                               class="form-control"
+                               @bind="currentItem.Identification"
+                               maxlength="11"
+                               oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
                     </div>
 
                     <div class="mb-3">
@@ -194,7 +236,7 @@
                     @if (userRole == UserRole.admin || userRole == UserRole.doctor)
                     {
                         <div class="mb-3 text-end">
-                            <button class="btn btn-primary btn-sm" @onclick="ShowAddRecordModal" >
+                            <button class="btn btn-primary btn-sm" @onclick="ShowAddRecordModal">
                                 <i class="bi bi-plus-circle"></i> Añadir registro
                             </button>
                         </div>
@@ -303,6 +345,215 @@
     </div>
 }
 
+@if (showAddPatientAllergyModal)
+{
+    <div class="modal fade show d-block" tabindex="-1"
+         style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Añadir Alergia al Paciente</h5>
+                    <button class="btn-close" @onclick="() => showAddPatientAllergyModal = false"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <!-- PACIENTE -->
+                    <div class="mb-3">
+                        <label class="form-label">Paciente</label>
+
+                        <div class="input-group">
+                            <span class="input-group-text">ID</span>
+                            <input type="text" class="form-control"
+                                   value="@newPatientAllergy.PatientId" readonly />
+
+                            <span class="input-group-text">Nombre</span>
+                            <input type="text" class="form-control"
+                                   value="@patientPagedResult?.Items?.FirstOrDefault(x => x.Id == newPatientAllergy.PatientId)?.FullName"
+                                   readonly />
+
+                            <!-- Botón invisible solo para mantener el ancho -->
+                            <button class="btn btn-outline-primary invisible" disabled>
+                                Seleccionar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- ALERGIA -->
+                    <div class="mb-3">
+                        <label class="form-label">Alergia</label>
+
+                        <div class="input-group">
+                            <span class="input-group-text">ID</span>
+                            <input type="text" class="form-control"
+                                   value="@newPatientAllergy.AllergyId" readonly />
+
+                            <span class="input-group-text">Nombre</span>
+                            <input type="text" class="form-control"
+                                   value="@allergyPagedResult.Items.FirstOrDefault(x => x.Id == newPatientAllergy.AllergyId)?.Name"
+                                   readonly />
+
+                            <button class="btn btn-outline-primary"
+                                    type="button"
+                                    @onclick="OpenSelectorAllergy">
+                                Seleccionar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- SEVERITY -->
+                    <div class="mb-3">
+                        <label class="form-label">Severidad</label>
+                        <select class="form-select" @bind="newPatientAllergy.Severity">
+                            <option value="@SeverityAllergy.Mild">Leve</option>
+                            <option value="@SeverityAllergy.Moderate">Moderada</option>
+                            <option value="@SeverityAllergy.Severe">Severa</option>
+                        </select>
+                    </div>
+
+                    <!-- NOTES -->
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea class="form-control" rows="3"
+                                  @bind="newPatientAllergy.Notes"></textarea>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary"
+                            @onclick="() => showAddPatientAllergyModal = false">
+                        Cancelar
+                    </button>
+
+                    <button class="btn btn-primary"
+                            @onclick="CreatePatientAllergy">
+                        Guardar
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+
+@if (showAllergySelector)
+{
+    <div class="modal fade show d-block" tabindex="-1"
+         style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Seleccionar Alergia</h5>
+                    <button class="btn-close" @onclick="CloseAllergySelector"></button>
+                </div>
+
+                <button class="btn btn-outline-success ms-2" @onclick="ShowAddAllergyModal">
+                    <i class="bi bi-plus-circle"></i> Añadir Alergia
+                </button>
+
+                <div class="modal-body">
+
+                    <!-- BUSCADOR -->
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control"
+                               placeholder="Buscar alergia..."
+                               @bind="allergyQueryParameters.SearchTerm" />
+
+                        <button class="btn btn-outline-primary"
+                                @onclick="FilterAllergies">
+                            Buscar
+                        </button>
+                    </div>
+
+                    <!-- LISTA -->
+                    @if (allergyPagedResult.Items != null && allergyPagedResult.Items.Any())
+                    {
+                        <div class="list-group">
+                            @foreach (var a in allergyPagedResult.Items)
+                            {
+                                <button class="list-group-item list-group-item-action"
+                                        @onclick="() => SelectAllergy(a)">
+                                    <div class="fw-semibold">@a.Name</div>
+                                    <small class="text-muted">ID: @a.Id</small>
+                                </button>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted py-3">
+                            No se encontraron alergias.
+                        </div>
+                    }
+
+                    <!-- PAGINACIÓN -->
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <button class="btn btn-outline-secondary btn-sm"
+                                @onclick="PrevAllergyPage">
+                            Anterior
+                        </button>
+
+                        <span class="fw-semibold text-secondary">
+                            Página @allergyQueryParameters.Page
+                        </span>
+
+                        <button class="btn btn-outline-secondary btn-sm"
+                                @onclick="NextAllergyPage">
+                            Siguiente
+                        </button>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseAllergySelector">
+                        Cerrar
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+
+@if (showAddAllergyModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title">Nueva Alergia</h5>
+                    <button type="button" class="btn-close" @onclick="CloseAddAllergyModal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" class="form-control" @bind="newAllergy.Name">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Descripción</label>
+                        <textarea class="form-control" rows="3" @bind="newAllergy.Description"></textarea>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseAddAllergyModal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" @onclick="CreateAllergy">Guardar</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+
 
 @code {
     // ============================
@@ -348,6 +599,50 @@
     private bool showRecordModal = false;
     private bool isEditRecordMode = false;
     private MedicalRecordDto currentRecord = new();
+
+    // ============================
+    //      ADD PATIENT ALLERGY
+    // ============================
+    private bool showAddPatientAllergyModal = false;
+    private AddPatientAllergyDto newPatientAllergy = new();
+
+    // ============================
+    //      ADD ALLERGY
+    // ============================
+    private bool showAllergySelector = false;
+    private bool showAddAllergyModal = false;
+
+    private AllergyDto newAllergy = new();
+    private PagedResult<AllergyDto> allergyPagedResult = new();
+    private QueryAllergyParameters allergyQueryParameters = new()
+    {
+        Page = 1,
+        PageSize = 10,
+        SearchTerm = string.Empty
+    };
+
+    private void ShowAddPatientAllergy(PatientDto patient)
+    {
+        newPatientAllergy = new AddPatientAllergyDto
+        {
+            PatientId = patient.Id,
+            Severity = SeverityAllergy.Mild,
+            Notes = ""
+        };
+
+        showAddPatientAllergyModal = true;
+    }
+
+    private async Task CreatePatientAllergy()
+    {
+        var response = await _patientAllergyService.CreatePatientAllergy(newPatientAllergy);
+
+        if (response.Success)
+        {
+            showAddPatientAllergyModal = false;
+            await LoadPatients();
+        }
+    }
 
     // ============================
     //      INITIAL LOAD
@@ -550,7 +845,9 @@
     {
         currentItem = patient;
         medicalRecordQueryParameters.patientId = patient.Id;
-        await DecodeJwtToken();
+        var userAuthenticated = await _authService.DecodeAsync();
+        currentDoctorId = userAuthenticated.Id;
+        userRole = userAuthenticated.Role;
         await LoadMedicalRecords();
         showRecordsModal = true;
     }
@@ -560,68 +857,6 @@
         showRecordsModal = false;
         currentItem = new();
         medicalRecordPagedResult = new();
-    }
-
-    // ============================
-    //      JWT DECODING
-    // ============================
-    private async Task DecodeJwtToken()
-    {
-        var token = await _secureStorageService.GetAsync("auth_token");
-
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            userRole = UserRole.assistant;
-            currentDoctorId = 0;
-            return;
-        }
-
-        try
-        {
-            // El JWT está en formato "header.payload.signature"
-            var parts = token.Split('.');
-            if (parts.Length != 3)
-                throw new Exception("Token inválido");
-
-            // Decodificamos el payload (parte 2)
-            var payload = parts[1];
-            var jsonBytes = ParseBase64WithoutPadding(payload);
-            var json = System.Text.Encoding.UTF8.GetString(jsonBytes);
-
-            // Deserializamos el contenido
-            var claims = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json);
-
-            if (claims != null)
-            {
-                if (claims.TryGetValue("Role", out var roleValue))
-                {
-                    Enum.TryParse(roleValue.ToString(), true, out userRole);
-                }
-
-                if (claims.TryGetValue("Id", out var idValue))
-                {
-                    int.TryParse(idValue.ToString(), out currentDoctorId);
-                }
-            }
-        }
-        catch
-        {
-            userRole = UserRole.assistant;
-            currentDoctorId = 0;
-        }
-    }
-
-    // Convierte Base64URL a bytes
-    private static byte[] ParseBase64WithoutPadding(string base64)
-    {
-        switch (base64.Length % 4)
-        {
-            case 2: base64 += "=="; break;
-            case 3: base64 += "="; break;
-        }
-
-        base64 = base64.Replace('-', '+').Replace('_', '/');
-        return Convert.FromBase64String(base64);
     }
 
     // ============================
@@ -650,6 +885,15 @@
         showRecordModal = false;
         currentRecord = new MedicalRecordDto();
     }
+
+    // Badge visual para severidad
+    private string GetSeverityBadge(SeverityAllergy severity) => severity switch
+    {
+        SeverityAllergy.Mild => "bg-success",
+        SeverityAllergy.Moderate => "bg-warning text-dark",
+        SeverityAllergy.Severe => "bg-danger",
+        _ => "bg-secondary"
+    };
 
     // ============================
     //      MÉTODOS DE GUARDADO
@@ -689,4 +933,124 @@
             CloseRecordModal();
         }
     }
+
+    // Método para obtener la clase CSS según la severidad
+    private string GetSeverityBadgeClass(SeverityAllergy severity)
+    {
+        return severity switch
+        {
+            SeverityAllergy.Mild => "bg-success-subtle text-success",
+            SeverityAllergy.Moderate => "bg-warning-subtle text-warning",
+            SeverityAllergy.Severe => "bg-danger text-white",
+            _ => "bg-secondary"
+        };
+    }
+
+    // ============================
+    //  HANDLING ALLERGY SELECTION
+    // ============================
+    private async Task LoadAllergies()
+    {
+        var response = await _allergyService.GetAllergies(allergyQueryParameters);
+        if (response.Success)
+            allergyPagedResult = response.Data!;
+    }
+
+    private async Task FilterAllergies()
+    {
+        allergyQueryParameters.Page = 1;
+        await LoadAllergies();
+    }
+
+    private async Task OpenSelectorAllergy()
+    {
+        await LoadAllergies();
+        showAllergySelector = true;
+    }
+
+    private void CloseAllergySelector()
+    {
+        showAllergySelector = false;
+    }
+
+    private void SelectAllergy(AllergyDto allergy)
+    {
+        newPatientAllergy.AllergyId = allergy.Id;
+        showAllergySelector = false;
+    }
+
+    private async Task PrevAllergyPage()
+    {
+        if (allergyQueryParameters.Page > 1)
+        {
+            allergyQueryParameters.Page--;
+            await LoadAllergies();
+        }
+    }
+
+    private async Task NextAllergyPage()
+    {
+        allergyQueryParameters.Page++;
+        await LoadAllergies();
+    }
+
+    // ============================
+    //      ADD ALLERGY HANDLERS
+    // ============================
+    private void ShowAddAllergyModal()
+    {
+        newAllergy = new AllergyDto();
+        showAddAllergyModal = true;
+    }
+
+    private void CloseAddAllergyModal()
+    {
+        showAddAllergyModal = false;
+    }
+
+    private async Task CreateAllergy()
+    {
+        var dto = new CreateAllergyDto
+        {
+            Name = newAllergy.Name,
+            Description = newAllergy.Description
+        };
+
+        var response = await _allergyService.CreateAllergy(dto);
+
+        if (response.Success)
+        {
+            await LoadAllergies();     // recargar lista en el selector
+            showAddAllergyModal = false;
+        }
+    }
+
 }
+
+<style>
+    /* Estilos personalizados para las alergias */
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.35em 0.65em;
+        font-weight: 500;
+    }
+
+    .table td {
+        vertical-align: middle;
+    }
+
+    .gap-1 {
+        gap: 0.25rem;
+    }
+
+    /* Tooltip personalizado para alergias */
+    [title] {
+        cursor: help;
+    }
+
+    /* Botones de acción más compactos */
+    .btn-group-sm > .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+</style>

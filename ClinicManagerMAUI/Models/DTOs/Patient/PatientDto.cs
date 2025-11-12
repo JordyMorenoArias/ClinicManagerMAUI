@@ -1,6 +1,8 @@
 ﻿using ClinicManagerMAUI.Models.DTOs.MedicalRecord;
 using ClinicManagerMAUI.Models.DTOs.Appointment;
 using System.ComponentModel.DataAnnotations;
+using ClinicManagerMAUI.Models.DTOs.Allergy;
+using ClinicManagerMAUI.Models.DTOs.PatientAllergy;
 
 namespace ClinicManagerMAUI.Models.DTOs.Patient
 {
@@ -24,11 +26,12 @@ namespace ClinicManagerMAUI.Models.DTOs.Patient
         [MaxLength(200)]
         public string Address { get; set; } = string.Empty;
 
-        public DateTime DateOfBirth { get; set; }
+        public DateTime DateOfBirth { get; set; } = new DateTime(2000, 1, 1);
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public ICollection<AppointmentDto> Appointments { get; set; } = new List<AppointmentDto>();
         public ICollection<MedicalRecordDto> MedicalRecords { get; set; } = new List<MedicalRecordDto>();
-    } 
+        public ICollection<PatientAllergyDto> Allergies { get; set; } = new List<PatientAllergyDto>();
+    }
 }
