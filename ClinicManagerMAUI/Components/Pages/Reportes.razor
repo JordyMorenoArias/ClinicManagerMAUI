@@ -1,5 +1,537 @@
 ﻿@page "/Reportes"
 
-@code {
+@inject IReportService _reportService
+@inject IJSRuntime JSRuntime
 
+<div class="container py-4">
+    <h2 class="mb-4 fw-bold">📊 Reportes y Estadísticas</h2>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <label class="form-label fw-semibold">Fecha inicio</label>
+            <input type="date" class="form-control" @bind="startDate" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-semibold">Fecha fin</label>
+            <input type="date" class="form-control" @bind="endDate" />
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-primary w-100" @onclick="LoadReport">
+                <i class="bi bi-bar-chart-line me-2"></i>Generar Reporte
+            </button>
+        </div>
+    </div>
+</div>
+
+@if (report != null)
+{
+    <div class="container mb-5">
+        <!-- Tarjetas de resumen -->
+        <div class="row g-3 mb-4">
+            <div class="col-md">
+                <div class="card shadow-sm border-0 border-start border-primary border-4 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="text-muted mb-1 small">Total Citas</p>
+                                <h3 class="fw-bold mb-0">@report?.TotalAppointments</h3>
+                            </div>
+                            <div class="fs-1 text-primary opacity-25">
+                                <i class="bi bi-calendar-check"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md">
+                <div class="card shadow-sm border-0 border-start border-success border-4 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="text-muted mb-1 small">Completadas</p>
+                                <h3 class="fw-bold mb-0">@report?.CompletedAppointments</h3>
+                            </div>
+                            <div class="fs-1 text-success opacity-25">
+                                <i class="bi bi-check-circle"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md">
+                <div class="card shadow-sm border-0 border-start border-info border-4 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="text-muted mb-1 small">Confirmadas</p>
+                                <h3 class="fw-bold mb-0">@report?.ConfirmedAppointments</h3>
+                            </div>
+                            <div class="fs-1 text-info opacity-25">
+                                <i class="bi bi-calendar-event"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md">
+                <div class="card shadow-sm border-0 border-start border-warning border-4 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="text-muted mb-1 small">Pendientes</p>
+                                <h3 class="fw-bold mb-0">@report?.PendingAppointments</h3>
+                            </div>
+                            <div class="fs-1 text-warning opacity-25">
+                                <i class="bi bi-clock"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md">
+                <div class="card shadow-sm border-0 border-start border-danger border-4 h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <p class="text-muted mb-1 small">Canceladas</p>
+                                <h3 class="fw-bold mb-0">@report?.CancelledAppointments</h3>
+                            </div>
+                            <div class="fs-1 text-danger opacity-25">
+                                <i class="bi bi-x-circle"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección de gráficos principales -->
+        <div class="row g-3 mb-4">
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-pie-chart text-primary me-2"></i>Estado de Citas
+                        </h5>
+                        <canvas id="appointmentsStatusChart" style="max-height: 300px;"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-people text-success me-2"></i>Pacientes Nuevos vs Recurrentes
+                        </h5>
+                        <canvas id="patientsPieChart" style="max-height: 300px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-clock-history text-info me-2"></i>Horarios Más Solicitados
+                        </h5>
+                        <canvas id="timeSlotBarChart" style="max-height: 350px;"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rankings y listas -->
+        <div class="row g-3 mb-4">
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-trophy text-warning me-2"></i>Top Doctores
+                        </h5>
+                        <p class="text-muted small mb-3">Por citas completadas</p>
+                        <div class="list-group list-group-flush">
+                            @if (report?.TopDoctorsByCompletedAppointments != null)
+                            {
+                                var topDoctors = report.TopDoctorsByCompletedAppointments.ToList();
+                                for (int i = 0; i < topDoctors.Count; i++)
+                                {
+                                    var doc = topDoctors[i];
+                                    <div class="list-group-item d-flex align-items-center border-0 px-0">
+                                        <span class="badge bg-primary rounded-circle me-3" style="width: 32px; height: 32px; line-height: 24px;">
+                                            @(i + 1)
+                                        </span>
+                                        <span>@doc.FullName</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-person-badge text-info me-2"></i>Top Asistentes
+                        </h5>
+                        <p class="text-muted small mb-3">Por citas agendadas</p>
+                        <div class="list-group list-group-flush">
+                            @if (report?.TopAssistantsByScheduledAppointments != null)
+                            {
+                                var topAssistants = report.TopAssistantsByScheduledAppointments.ToList();
+                                for (int i = 0; i < topAssistants.Count; i++)
+                                {
+                                    var assist = topAssistants[i];
+                                    <div class="list-group-item d-flex align-items-center border-0 px-0">
+                                        <span class="badge bg-info rounded-circle me-3" style="width: 32px; height: 32px; line-height: 24px;">
+                                            @(i + 1)
+                                        </span>
+                                        <span>@assist.FullName</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-star text-success me-2"></i>Pacientes Frecuentes
+                        </h5>
+                        <p class="text-muted small mb-3">Más visitas en el período</p>
+                        <div class="list-group list-group-flush">
+                            @if (report?.MostFrequentPatients != null)
+                            {
+                                var frequentPatients = report.MostFrequentPatients.ToList();
+                                for (int i = 0; i < frequentPatients.Count; i++)
+                                {
+                                    var patient = frequentPatients[i];
+                                    <div class="list-group-item d-flex align-items-center border-0 px-0">
+                                        <span class="badge bg-success rounded-circle me-3" style="width: 32px; height: 32px; line-height: 24px;">
+                                            @(i + 1)
+                                        </span>
+                                        <span>@patient.FullName</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumen de pacientes -->
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-person-plus text-primary me-2"></i>Pacientes Nuevos
+                        </h5>
+                        <h2 class="fw-bold text-primary">@report!.NewPatients</h2>
+                        <p class="text-muted mb-0">Pacientes registrados en el período</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">
+                            <i class="bi bi-arrow-repeat text-success me-2"></i>Pacientes Recurrentes
+                        </h5>
+                        <h2 class="fw-bold text-success">@report.ReturningPatients</h2>
+                        <p class="text-muted mb-0">Pacientes que regresaron</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 }
+else
+{
+    <div class="container mb-5">
+        <div class="alert alert-info" role="alert">
+            <i class="bi bi-info-circle me-2"></i>Seleccione un rango de fechas y haga clic en "Generar Reporte" para ver las estadísticas.
+        </div>
+    </div>
+}
+
+@code {
+    private DateTime startDate = new DateTime(DateTime.Today.Year, 1, 1);
+    private DateTime endDate = new DateTime(DateTime.Today.Year, 12, 31);
+    private ReportSummaryDto? report;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReport();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (report != null)
+        {
+            await RenderCharts();
+        }
+    }
+
+    private async Task LoadReport()
+    {
+        var queryParameters = new QueryReportParameters
+        {
+            StartDate = startDate,
+            EndDate = endDate
+        };
+
+        var response = await _reportService.GeneratePatientReportAsync(queryParameters);
+
+        if (response.Success && response.Data != null)
+        {
+            report = response.Data;
+            StateHasChanged();
+            await RenderCharts();
+        }
+        else
+        {
+            report = null;
+        }
+    }
+
+    private async Task RenderCharts()
+    {
+        if (report == null) return;
+
+        try
+        {
+            // Gráfico de estado de citas
+            await JSRuntime.InvokeVoidAsync("renderAppointmentsStatusChart", new
+            {
+                completed = report.CompletedAppointments,
+                confirmed = report.ConfirmedAppointments,
+                pending = report.PendingAppointments,
+                cancelled = report.CancelledAppointments
+            });
+
+            // Gráfico de pacientes
+            await JSRuntime.InvokeVoidAsync("renderPatientsPieChart", new
+            {
+                newPatients = report.NewPatients,
+                returningPatients = report.ReturningPatients
+            });
+
+            // Gráfico de horarios
+            var timeSlotLabels = report.MostRequestedTimeSlots.Select(s => s.TimeRange).ToArray();
+            var timeSlotData = report.MostRequestedTimeSlots.Select(s => s.AppointmentCount).ToArray();
+            await JSRuntime.InvokeVoidAsync("renderTimeSlotBarChart", timeSlotLabels, timeSlotData);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error rendering charts: {ex.Message}");
+        }
+    }
+}
+
+<script>
+    // charts.js - Funciones para renderizar gráficos con ChartMicrosoft.JSInterop.JSException: 'Chart is not defined
+ReferenceError: Chart is not defined
+    at window.renderAppointmentsStatusChart (https://0.0.0.1/js/charts.js:16:5)
+    at https://0.0.0.1/_framework/blazor.webview.js:1:2891
+    at new Promise (<anonymous>)
+    at y.beginInvokeJSFromDotNet (https://0.0.0.1/_framework/blazor.webview.js:1:2848)
+    at https://0.0.0.1/_framework/blazor.webview.js:1:47076
+    at EventTarget.<anonymous> (<anonymous>:7:62)
+    at EmbeddedBrowserWebView.<anonymous> (<anonymous>:1:30238)'.js
+
+    let appointmentsStatusChart = null;
+    let patientsPieChart = null;
+    let timeSlotBarChart = null;
+
+    window.renderAppointmentsStatusChart = function(data) {
+        const ctx = document.getElementById('appointmentsStatusChart');
+        if (!ctx) return;
+
+        // Destruir gráfico anterior si existe
+        if (appointmentsStatusChart) {
+            appointmentsStatusChart.destroy();
+        }
+
+        appointmentsStatusChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Completadas', 'Confirmadas', 'Pendientes', 'Canceladas'],
+                datasets: [{
+                    data: [data.completed, data.confirmed, data.pending, data.cancelled],
+                    backgroundColor: [
+                        'rgba(25, 135, 84, 0.8)',    // success
+                        'rgba(13, 202, 240, 0.8)',   // info
+                        'rgba(255, 193, 7, 0.8)',    // warning
+                        'rgba(220, 53, 69, 0.8)'     // danger
+                    ],
+                    borderColor: [
+                        'rgba(25, 135, 84, 1)',
+                        'rgba(13, 202, 240, 1)',
+                        'rgba(255, 193, 7, 1)',
+                        'rgba(220, 53, 69, 1)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    window.renderPatientsPieChart = function(data) {
+        const ctx = document.getElementById('patientsPieChart');
+        if (!ctx) return;
+
+        if (patientsPieChart) {
+            patientsPieChart.destroy();
+        }
+
+        patientsPieChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Nuevos', 'Recurrentes'],
+                datasets: [{
+                    data: [data.newPatients, data.returningPatients],
+                    backgroundColor: [
+                        'rgba(13, 110, 253, 0.8)',   // primary
+                        'rgba(25, 135, 84, 0.8)'     // success
+                    ],
+                    borderColor: [
+                        'rgba(13, 110, 253, 1)',
+                        'rgba(25, 135, 84, 1)'
+                    ],
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 15,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    window.renderTimeSlotBarChart = function(labels, data) {
+        const ctx = document.getElementById('timeSlotBarChart');
+        if (!ctx) return;
+
+        if (timeSlotBarChart) {
+            timeSlotBarChart.destroy();
+        }
+
+        timeSlotBarChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Cantidad de Citas',
+                    data: data,
+                    backgroundColor: 'rgba(13, 202, 240, 0.8)',
+                    borderColor: 'rgba(13, 202, 240, 1)',
+                    borderWidth: 2,
+                    borderRadius: 5,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `Citas: ${context.parsed.y}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            font: {
+                                size: 11
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            font: {
+                                size: 11
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    };
+</script>
