@@ -1,0 +1,152 @@
+﻿@inject NavigationManager Navigation
+@inject IAuthService AuthService
+
+@page "/"
+
+<style>
+    /* Contenedor que ocupa toda la pantalla */
+    .login-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+
+        padding: 1rem;
+    }
+
+    /* Contenedor principal */
+    .container {
+        max-width: 400px;
+        width: 100%;
+        background: #ffffff;
+        padding: 2rem;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        text-align: center;
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+    }
+
+    /* Título */
+    .form-title {
+        font-size: 1.8rem;
+        margin-bottom: 1.5rem;
+        color: #333;
+        letter-spacing: 1px;
+    }
+
+    /* Grupo de inputs */
+    .form-group {
+        margin-bottom: 1.2rem;
+        text-align: left;
+    }
+
+    /* Etiquetas */
+    .form-label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.4rem;
+        color: #444;
+    }
+
+    /* Campos de texto */
+    .form-input {
+        width: 100%;
+        padding: 0.7rem 1rem;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: border 0.3s, box-shadow 0.3s;
+    }
+
+        .form-input:focus {
+            outline: none;
+            border: 1px solid #0078d7;
+            box-shadow: 0 0 4px rgba(0, 120, 215, 0.4);
+        }
+
+    /* Botón */
+    .form-button {
+        width: 100%;
+        padding: 0.8rem;
+        background-color: #0078d7;
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+
+        .form-button:hover {
+            background-color: #005fa3;
+        }
+
+    /* Mensaje de error */
+    .error-message {
+        margin-top: 1rem;
+        color: #d9534f;
+        font-weight: 500;
+        background: #fce4e4;
+        padding: 0.6rem;
+        border-radius: 6px;
+    }
+</style>
+
+<PageTitle>Login</PageTitle>
+
+<div class="login-wrapper">
+    <div class="container">
+        <h1 class="form-title">SIGN IN</h1>
+        <EditForm Model="@loginModel" OnValidSubmit="@Authenticate">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            <div class="form-group">
+                <label for="user" class="form-label">User</label>
+                <input type="text" id="user" class="form-input" @bind-value="loginModel.User" placeholder="User" autocomplete="off" required />
+            </div>
+            <div class="form-group password-container">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" id="password" class="form-input" @bind-value="loginModel.Password" placeholder="Password" required />
+            </div>
+            <button type="submit" class="form-button">LOG IN</button>
+        </EditForm>
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="error-message">@errorMessage</div>
+        }
+    </div>
+</div>
+
+@code {
+    private LoginModelViewData loginModel = new LoginModelViewData();
+    private string errorMessage = string.Empty;
+
+    private async Task Authenticate()
+    {
+        try
+        {
+            var loginModel = new UserLoginDto
+            {
+                UserName = this.loginModel.User,
+                Password = this.loginModel.Password
+            };
+
+            var response = await AuthService.Login(loginModel);
+
+            if (response.Success)
+            {
+                Navigation.NavigateTo("/citas");
+            }
+            else
+            {
+                errorMessage = response.ErrorMessage!;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An unexpected error occurred. Please try again later.";
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+}

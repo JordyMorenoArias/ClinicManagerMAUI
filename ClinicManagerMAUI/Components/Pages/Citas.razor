@@ -1,0 +1,707 @@
+﻿@page "/citas"
+
+@inject IUserService _userService
+@inject IAppointmentService _appointmentService
+@inject IPatientService _patientService
+
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2 class="mb-0">Gestión de Citas</h2>
+        </div>
+    </div>
+
+    <!-- Barra de acciones -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <button class="btn btn-primary" @onclick="ShowAddModal">
+                <i class="bi bi-plus-circle"></i> Añadir Nueva Cita
+            </button>
+        </div>
+
+        <!-- Filtro por estado -->
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="bi bi-ui-checks"></i>
+                </span>
+                <select class="form-select" @bind="appointmentQueryParameters.Status" @bind:after="ApplyAppointmentFilter">
+                    <option value="">Todos los estados</option>
+                    <option value="@AppointmentStatus.Pending">Pendiente</option>
+                    <option value="@AppointmentStatus.Confirmed">Confirmada</option>
+                    <option value="@AppointmentStatus.Completed">Completada</option>
+                    <option value="@AppointmentStatus.Cancelled">Cancelada</option>
+                    <option value="@AppointmentStatus.NoShow">No Asistió</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Filtro de orden -->
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="bi bi-filter"></i>
+                </span>
+                <select class="form-select" @bind="appointmentQueryParameters.SortBy" @bind:after="ApplyAppointmentFilter">
+                    <option value=@AppointmentSortBy.AppointmentDateAsc>Fecha de Cita (Ascendente)</option>
+                    <option value=@AppointmentSortBy.AppointmentDateDesc>Fecha de Cita (Descendente)</option>
+                    <option value=@AppointmentSortBy.CreatedAtAsc>Fecha de Creación (Ascendente)</option>
+                    <option value=@AppointmentSortBy.CreatedAtDesc>Fecha de Creación (Descendente)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Tabla de datos -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Paciente</th>
+                                    <th>Fecha de Cita</th>
+                                    <th>Fecha de Creación</th>
+                                    <th>Estado</th>
+                                    <th class="text-end">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (appointmentPagedResult.Items != null && appointmentPagedResult.Items.Any())
+                                {
+                                    @foreach (var item in appointmentPagedResult.Items)
+                                    {
+                                        <tr>
+                                            <td>@item.Id</td>
+                                            <td>@item.Patient.FullName</td>
+                                            <td>@item.AppointmentDate.ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td>@item.CreatedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                                            <td>
+                                                <span class="badge @GetStatusBadgeClass(item.Status)">
+                                                    @item.Status.ToString()
+                                                </span>
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-sm btn-outline-primary"
+                                                        @onclick="() => ShowEditModal(item)">
+                                                    <i class="bi bi-pencil"></i> Editar
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                                else
+                                {
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4 text-muted">
+                                            No hay datos para mostrar
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Paginación -->
+                    @if (appointmentPagedResult != null && appointmentPagedResult.TotalPages > 1)
+                    {
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div class="text-muted small">
+                                Mostrando @GetStartRecord() - @GetEndRecord() de @appointmentPagedResult.TotalItems registros
+                            </div>
+
+                            <nav aria-label="Paginación">
+                                <ul class="pagination mb-0">
+                                    <li class="page-item @(appointmentPagedResult.Page == 1 ? "disabled" : "")">
+                                        <button class="page-link" @onclick="FirstPage">Primero</button>
+                                    </li>
+                                    <li class="page-item @(appointmentPagedResult.Page == 1 ? "disabled" : "")">
+                                        <button class="page-link" @onclick="PreviousPage">Anterior</button>
+                                    </li>
+
+                                    @for (int i = GetStartPage(); i <= GetEndPage(); i++)
+                                    {
+                                        var pageNumber = i;
+                                        <li class="page-item @(appointmentPagedResult.Page == pageNumber ? "active" : "")">
+                                            <button class="page-link" @onclick="() => GoToPage(pageNumber)">
+                                                @pageNumber
+                                            </button>
+                                        </li>
+                                    }
+
+                                    <li class="page-item @(appointmentPagedResult.Page == appointmentPagedResult.TotalPages ? "disabled" : "")">
+                                        <button class="page-link" @onclick="NextPage">Siguiente</button>
+                                    </li>
+                                    <li class="page-item @(appointmentPagedResult.Page == appointmentPagedResult.TotalPages ? "disabled" : "")">
+                                        <button class="page-link" @onclick="LastPage">Último</button>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Añadir/Editar -->
+@if (showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(isEditMode ? "Editar Cita" : "Nueva Cita")</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <div class="mb-3">
+                        <label class="form-label">Paciente</label>
+
+                        <div class="input-group">
+                            <!-- Campo ID -->
+                            <span class="input-group-text">ID</span>
+                            <input type="text" class="form-control" value="@currentItem.Patient?.Id" readonly />
+
+                            <span class="input-group-text">Nombre</span>
+                            <input type="text" class="form-control" value="@currentItem.Patient?.FullName" readonly />
+
+                            <button class="btn btn-outline-primary" @onclick="OpenSelectorPatient">
+                                Seleccionar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Información del Doctor -->
+                    <div class="mb-3">
+                        <label class="form-label">Doctor</label>
+                        <div class="input-group">
+                            <span class="input-group-text">ID</span>
+                            <input type="text" class="form-control" value="@currentItem.Doctor?.Id" readonly />
+
+                            <span class="input-group-text">Nombre</span>
+                            <input type="text" class="form-control" value="@currentItem.Doctor?.FullName" readonly />
+
+                            <button class="btn btn-outline-primary" @onclick="OpenSelectorDoctor">
+                                Seleccionar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Fecha de la cita -->
+                    <div class="mb-3">
+                        <label class="form-label">Fecha de Cita</label>
+                        <input type="datetime-local" class="form-control" @bind="currentItem.AppointmentDate" />
+                    </div>
+
+                    <!-- Razón de la cita -->
+                    <div class="mb-3">
+                        <label class="form-label">Razón de Cita</label>
+                        <input type="text" class="form-control" @bind="currentItem.Reason" />
+                    </div>
+
+                    <!-- Estado (solo en edición) -->
+                    @if (isEditMode)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Estado</label>
+                            <select class="form-select" @bind="currentItem.Status">
+                                <option value=@AppointmentStatus.Pending>Pendiente</option>
+                                <option value=@AppointmentStatus.Confirmed>Confirmada</option>
+                                <option value=@AppointmentStatus.Completed>Completada</option>
+                                <option value=@AppointmentStatus.Cancelled>Cancelada</option>
+                                <option value=@AppointmentStatus.NoShow>No Mostrar</option>
+                            </select>
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Cancelar</button>
+                    @if (isEditMode)
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="UpdateAppointment">Actualizar</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="AddAppointment">Guardar</button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showSelector)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    @if (isDoctorSelector)
+                    {
+                        <h5 class="modal-title">Seleccionar Doctor</h5>
+                    }
+                    else
+                    {
+                        <h5 class="modal-title">Seleccionar Paciente</h5>
+                    }
+                    <button type="button" class="btn-close" @onclick="CloseSelector"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <!-- Cuadro de búsqueda -->
+                    <div class="input-group mb-3">
+                        @if (isDoctorSelector)
+                        {
+                            <input type="text" class="form-control" placeholder="Buscar doctor..." @bind="doctorQueryParameters.SearchTerm" />
+                            <button class="btn btn-outline-primary" @onclick="FilterDoctor">
+                                Buscar
+                            </button>
+                        }
+                        else
+                        {
+                            <input type="text" class="form-control" placeholder="Buscar paciente..." @bind="patientQueryParameters.SearchTerm" />
+                            <button class="btn btn-outline-primary" @onclick="FilterPatients">
+                                Buscar
+                            </button>
+                        }
+                    </div>
+
+                    <!-- Lista de pacientes o doctores -->
+                    @if (isDoctorSelector)
+                    {
+                        @if (doctorPagedResult.Items != null && doctorPagedResult.Items.Any())
+                        {
+                            <div class="list-group">
+                                @foreach (var d in doctorPagedResult.Items)
+                                {
+                                    <button class="list-group-item list-group-item-action"
+                                            @onclick="() => SelectDoctor(d)">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <div class="fw-semibold">@d.FullName</div>
+                                                <small class="text-muted">ID: @d.Id</small>
+                                            </div>
+                                            <div class="ms-2">
+                                                @if (d.DoctorProfiles != null && d.DoctorProfiles.Any())
+                                                {
+                                                    var profile = d.DoctorProfiles.FirstOrDefault();
+                                                    <span class="badge bg-primary">
+                                                        <i class="bi bi-award-fill me-1"></i>@profile.Specialty
+                                                    </span>
+                                                    @if (profile.YearsOfExperience.HasValue)
+                                                    {
+                                                        <small class="d-block text-muted mt-1">
+                                                            @profile.YearsOfExperience años exp.
+                                                        </small>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Sin especialidad</span>
+                                                }
+                                            </div>
+                                        </div>
+                                    </button>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-3">
+                                No se encontraron doctores.
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        @if (patientPagedResult.Items != null && patientPagedResult.Items.Any())
+                        {
+                            <div class="list-group">
+                                @foreach (var p in patientPagedResult.Items)
+                                {
+                                    <button class="list-group-item list-group-item-action"
+                                            @onclick="() => SelectPatient(p)">
+                                        <div class="fw-semibold">@p.FullName</div>
+                                        <small class="text-muted">ID: @p.Identification</small>
+                                    </button>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-3">
+                                No se encontraron pacientes.
+                            </div>
+                        }
+                    }
+
+                    <!-- Controles de paginación -->
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="PrevSelectPage">
+                            Anterior
+                        </button>
+
+                        <span class="fw-semibold text-secondary">
+                            Página @patientQueryParameters.Page
+                        </span>
+
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="NextSelectPage">
+                            Siguiente
+                        </button>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseSelector">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // ============================
+    //      APPOINTMENTS
+    // ============================
+    private PagedResult<AppointmentDto> appointmentPagedResult = new();
+    private QueryAppointmentParameters appointmentQueryParameters = new()
+    {
+        Page = 1,
+        PageSize = 10,
+        SortBy = AppointmentSortBy.AppointmentDateAsc
+    };
+
+    private AppointmentDto currentItem = new();
+
+    // ============================
+    //      PATIENTS
+    // ============================
+    private PagedResult<PatientDto> patientPagedResult = new();
+    private QueryPatientParameters patientQueryParameters = new()
+    {
+        Page = 1,
+        PageSize = 6,
+        SearchTerm = string.Empty,
+        DateOfBirth = null
+    };
+
+    // ============================
+    //      DOCTORS
+    // ============================
+    private PagedResult<UserDto> doctorPagedResult = new();
+    private QueryUserParameters doctorQueryParameters = new()
+    {
+        Page = 1,
+        PageSize = 6,
+        UserRole = UserRole.doctor
+    };
+
+    // ============================
+    //      MODAL CONTROL
+    // ============================
+    private bool showModal = false;
+    private bool isEditMode = false;
+
+    // ============================
+    //      SELECTOR CONTROL
+    // ============================
+    private bool showSelector = false;
+    private bool isDoctorSelector = false;
+
+    // ============================
+    //      INITIAL LOAD
+    // ============================
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAppointments();
+    }
+
+    private async Task LoadAppointments()
+    {
+        var response = await _appointmentService.GetAppointments(appointmentQueryParameters);
+        if (response.Success)
+            appointmentPagedResult = response.Data!;
+    }
+
+    private async Task ApplyAppointmentFilter()
+    {
+        appointmentQueryParameters.Page = 1;
+        await LoadAppointments();
+    }
+
+    private async Task AddAppointment()
+    {
+        var AddDto = new AddAppointmentDto
+        {
+            PatientId = currentItem.PatientId,
+            DoctorId = currentItem.DoctorId,
+            AppointmentDate = currentItem.AppointmentDate,
+            Reason = currentItem.Reason
+        };
+
+        var response = await _appointmentService.CreateAppointment(AddDto);
+
+        if (response.Success)
+        {
+            await LoadAppointments();
+            CloseModal();
+        }
+    }
+
+    private async Task UpdateAppointment()
+    {
+        var updateDto = new UpdateAppointmentDto
+        {
+            Id = currentItem.Id,
+            PatientId = currentItem.PatientId,
+            DoctorId = currentItem.DoctorId,
+            AppointmentDate = currentItem.AppointmentDate,
+            Reason = currentItem.Reason,
+            Status = currentItem.Status
+        };
+
+        var response = await _appointmentService.UpdateAppointment(currentItem.Id, updateDto);
+
+        if (response.Success)
+        {
+            await LoadAppointments();
+            CloseModal();
+        }
+    }
+
+    // ============================
+    //      MODAL HANDLERS
+    // ============================
+    private void ShowAddModal()
+    {
+        isEditMode = false;
+        currentItem = new AppointmentDto
+        {
+            AppointmentDate = DateTime.Now,
+            Reason = string.Empty,
+            Status = AppointmentStatus.Pending
+        };
+
+        showModal = true;
+    }
+
+    private void ShowEditModal(AppointmentDto item)
+    {
+        isEditMode = true;
+        currentItem = new AppointmentDto
+        {
+            Id = item.Id,
+            PatientId = item.PatientId,
+            Patient = item.Patient,
+            DoctorId = item.DoctorId,
+            Doctor = item.Doctor,
+            AppointmentDate = item.AppointmentDate,
+            Reason = item.Reason,
+            Status = item.Status,
+            CreatedAt = item.CreatedAt
+        };
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        currentItem = new();
+    }
+
+    // ============================
+    //      STATUS BADGES
+    // ============================
+    private string GetStatusBadgeClass(AppointmentStatus status) => status switch
+    {
+        AppointmentStatus.Pending => "bg-warning text-dark",
+        AppointmentStatus.Confirmed => "bg-info text-dark",
+        AppointmentStatus.Completed => "bg-success",
+        AppointmentStatus.Cancelled => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    // ============================
+    //      SELECT LIST WINDOW
+    // ============================
+    private async Task LoadPatients()
+    {
+        var response = await _patientService.GetPatients(patientQueryParameters);
+        if (response.Success)
+            patientPagedResult = response.Data!;
+    }
+
+    private async Task LoadDoctors()
+    {
+        var response = await _userService.GetUsers(doctorQueryParameters);
+        if (response.Success)
+            doctorPagedResult = response.Data!;
+    }
+
+    private async Task FilterPatients()
+    {
+        patientQueryParameters.Page = 1;
+        await LoadPatients();
+    }
+
+    private async Task FilterDoctor()
+    {
+        doctorQueryParameters.Page = 1;
+        await LoadDoctors();
+    }
+
+    private async Task PrevSelectPage()
+    {
+        if (isDoctorSelector)
+        {
+            if (doctorQueryParameters.Page > 1)
+            {
+                doctorQueryParameters.Page--;
+                await LoadDoctors();
+            }
+            return;
+        }
+
+        if (patientQueryParameters.Page > 1)
+        {
+            patientQueryParameters.Page--;
+            await LoadPatients();
+        }
+    }
+
+    private async Task NextSelectPage()
+    {
+        if (isDoctorSelector)
+        {
+            if (doctorQueryParameters.Page >= doctorPagedResult.TotalPages)
+                doctorQueryParameters.Page = 1;
+            else
+                doctorQueryParameters.Page++;
+
+            await LoadDoctors();
+            return;
+        }
+
+        if (patientQueryParameters.Page >= patientPagedResult.TotalPages)
+            patientQueryParameters.Page = 1;
+        else
+            patientQueryParameters.Page++;
+
+        await LoadPatients();
+    }
+
+    private void SelectPatient(PatientDto patient)
+    {
+        currentItem.PatientId = patient.Id;
+        currentItem.Patient = patient;
+        showSelector = false;
+    }
+
+    private void SelectDoctor(UserDto doctor)
+    {
+        currentItem.DoctorId = doctor.Id;
+        currentItem.Doctor = doctor;
+        showSelector = false;
+    }
+
+    private async Task OpenSelectorPatient()
+    {
+        await LoadPatients();
+        showSelector = true;
+        isDoctorSelector = false;
+    }
+
+    private async Task OpenSelectorDoctor()
+    {
+        await LoadDoctors();
+        showSelector = true;
+        isDoctorSelector = true;
+    }
+
+    private void CloseSelector()
+    {
+        showSelector = false;
+    }
+
+    // ============================
+    //      PAGINATION
+    // ============================
+    private async Task FirstPage()
+    {
+        if (appointmentPagedResult.Page == 1) return;
+
+        appointmentQueryParameters.Page = 1;
+        await LoadAppointments();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (appointmentPagedResult.Page > 1)
+        {
+            appointmentQueryParameters.Page--;
+            await LoadAppointments();
+        }
+    }
+
+    private async Task NextPage()
+    {
+        if (appointmentPagedResult.Page < appointmentPagedResult.TotalPages)
+        {
+            appointmentQueryParameters.Page++;
+            await LoadAppointments();
+        }
+    }
+
+    private async Task LastPage()
+    {
+        if (appointmentPagedResult.Page == appointmentPagedResult.TotalPages) return;
+
+        appointmentQueryParameters.Page = appointmentPagedResult.TotalPages;
+        await LoadAppointments();
+    }
+
+    private async Task GoToPage(int pageNumber)
+    {
+        if (pageNumber < 1 || pageNumber > appointmentPagedResult.TotalPages) return;
+
+        appointmentQueryParameters.Page = pageNumber;
+        await LoadAppointments();
+    }
+
+    // ============================
+    //      AUXILIARY CALCULATIONS
+    // ============================
+    private int GetStartRecord()
+    {
+        if (appointmentPagedResult.TotalItems == 0) return 0;
+        return ((appointmentPagedResult.Page - 1) * appointmentPagedResult.PageSize) + 1;
+    }
+
+    private int GetEndRecord()
+    {
+        if (appointmentPagedResult.TotalItems == 0) return 0;
+        return Math.Min(appointmentPagedResult.Page * appointmentPagedResult.PageSize, appointmentPagedResult.TotalItems);
+    }
+
+    private int GetStartPage()
+    {
+        int start = Math.Max(1, appointmentPagedResult.Page - 2);
+        return Math.Min(start, Math.Max(1, appointmentPagedResult.TotalPages - 4));
+    }
+
+    private int GetEndPage()
+    {
+        int end = Math.Min(appointmentPagedResult.TotalPages, GetStartPage() + 4);
+        return Math.Max(end, Math.Min(5, appointmentPagedResult.TotalPages));
+    }
+}
