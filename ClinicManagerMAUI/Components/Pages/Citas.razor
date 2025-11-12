@@ -13,12 +13,31 @@
 
     <!-- Barra de acciones -->
     <div class="row mb-3">
-        <div class="col-md-6">
+        <div class="col-md-4">
             <button class="btn btn-primary" @onclick="ShowAddModal">
                 <i class="bi bi-plus-circle"></i> Añadir Nueva Cita
             </button>
         </div>
-        <div class="col-md-6">
+
+        <!-- Filtro por estado -->
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="bi bi-ui-checks"></i>
+                </span>
+                <select class="form-select" @bind="appointmentQueryParameters.Status" @bind:after="ApplyAppointmentFilter">
+                    <option value="">Todos los estados</option>
+                    <option value="@AppointmentStatus.Pending">Pendiente</option>
+                    <option value="@AppointmentStatus.Confirmed">Confirmada</option>
+                    <option value="@AppointmentStatus.Completed">Completada</option>
+                    <option value="@AppointmentStatus.Cancelled">Cancelada</option>
+                    <option value="@AppointmentStatus.NoShow">No Asistió</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Filtro de orden -->
+        <div class="col-md-4">
             <div class="input-group">
                 <span class="input-group-text">
                     <i class="bi bi-filter"></i>
@@ -32,6 +51,7 @@
             </div>
         </div>
     </div>
+
 
     <!-- Tabla de datos -->
     <div class="row">
@@ -256,7 +276,7 @@
                         }
                     </div>
 
-                    <!-- Lista de pacientes -->
+                    <!-- Lista de pacientes o doctores -->
                     @if (isDoctorSelector)
                     {
                         @if (doctorPagedResult.Items != null && doctorPagedResult.Items.Any())
@@ -266,8 +286,31 @@
                                 {
                                     <button class="list-group-item list-group-item-action"
                                             @onclick="() => SelectDoctor(d)">
-                                        <div class="fw-semibold">@d.FullName</div>
-                                        <small class="text-muted">ID: @d.Id</small>
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div class="flex-grow-1">
+                                                <div class="fw-semibold">@d.FullName</div>
+                                                <small class="text-muted">ID: @d.Id</small>
+                                            </div>
+                                            <div class="ms-2">
+                                                @if (d.DoctorProfiles != null && d.DoctorProfiles.Any())
+                                                {
+                                                    var profile = d.DoctorProfiles.FirstOrDefault();
+                                                    <span class="badge bg-primary">
+                                                        <i class="bi bi-award-fill me-1"></i>@profile.Specialty
+                                                    </span>
+                                                    @if (profile.YearsOfExperience.HasValue)
+                                                    {
+                                                        <small class="d-block text-muted mt-1">
+                                                            @profile.YearsOfExperience años exp.
+                                                        </small>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary">Sin especialidad</span>
+                                                }
+                                            </div>
+                                        </div>
                                     </button>
                                 }
                             </div>

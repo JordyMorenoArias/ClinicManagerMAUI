@@ -1,7 +1,6 @@
 ﻿using ClinicManagerMAUI.Models.DTOs.Appointment;
 using ClinicManagerMAUI.Models.DTOs.Generic;
 using ClinicManagerMAUI.Services.Interfaces;
-using System.Net.Http.Headers;
 
 namespace ClinicManagerMAUI.Services
 {
